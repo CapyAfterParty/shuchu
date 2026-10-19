@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shuchu · desk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Urbanist:ital,wght@0,200;0,300;0,400;1,200;1,300&display=swap">
+  <link rel="stylesheet" href="/public/mist.css">
+</head>
+<body class="desk">
+  <div class="mist" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+
+  <section class="pebble panel" aria-label="Waiting at your desk">
+    <header>
+      <span>Waiting at your desk</span>
+      <span class="link whisper"><span class="on">live</span><span class="off">listening…</span></span>
+    </header>
+
+    <div class="reading">
+      <span id="count" class="numeral">0</span>
+      <span class="unit">tasks</span>
+    </div>
+
+    <svg id="dial" viewBox="0 0 320 84" aria-hidden="true"></svg>
+
+    <p class="empty">What's on your mind?</p>
+    <ol id="list" class="tasks"></ol>
+  </section>
+
+  <script type="module" src="/js/clients/desktop/desk.js"></script>
+</body>
+</html>

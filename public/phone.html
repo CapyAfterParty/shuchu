@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#dce4ec" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#121921" media="(prefers-color-scheme: dark)">
+  <title>Shuchu</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Urbanist:ital,wght@0,200;0,300;0,400;1,200;1,300&display=swap">
+  <link rel="stylesheet" href="/public/mist.css">
+</head>
+<body>
+  <div class="mist" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+
+  <main class="capture">
+    <form id="capture" class="pebble capture-stone" autocomplete="off">
+      <label for="text" class="whisper">catch a thought</label>
+      <textarea id="text" rows="3" autofocus enterkeyhint="send" spellcheck="false"
+                placeholder="call dentist thing…"></textarea>
+      <button type="submit" class="save" aria-label="Save"><span class="spark"></span></button>
+    </form>
+    <p id="status" class="whisper status" role="status" aria-live="polite"></p>
+  </main>
+
+  <script type="module" src="/js/clients/phone/look.js"></script>
+  <script type="module" src="/js/clients/phone/phone.js"></script>
+</body>
+</html>

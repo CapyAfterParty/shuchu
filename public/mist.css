@@ -1,0 +1,370 @@
+/* Shuchu — mist & glass.
+   Frosted surfaces floating over a soft, out-of-focus atmosphere.
+   Tokens first, then the backdrop, the glass, the phone, the desk. */
+
+:root {
+  --font: "Urbanist", "Outfit", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* atmosphere */
+  --air: #dce4ec;
+  --mist-ice: #bfd1e2;
+  --mist-milk: #f3f5f7;
+  --mist-slate: #9fb3c8;
+  --mist-warm: #e6c3ad;          /* the hint of warmth bleeding through */
+
+  /* ink */
+  --ink: #1d2733;
+  --ink-soft: rgb(29 39 51 / 0.56);
+  --ink-faint: rgb(29 39 51 / 0.3);
+  --hair: rgb(29 39 51 / 0.22);
+
+  /* glass */
+  --glass-top: rgb(255 255 255 / 0.58);
+  --glass-low: rgb(255 255 255 / 0.16);
+  --glass-edge: rgb(255 255 255 / 0.7);
+  --glass-sheen: rgb(255 255 255 / 0.75);
+  --glass-shade: rgb(48 70 98 / 0.22);
+
+  /* the one warm accent: the spark */
+  --spark: #fffaf2;
+  --spark-glow: rgb(255 176 128 / 0.95);
+  --spark-haze: rgb(255 196 156 / 0.45);
+
+  --drift: cubic-bezier(0.22, 0.61, 0.36, 1);
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --air: #121921;
+    --mist-ice: #2b3d52;
+    --mist-milk: #3a4757;
+    --mist-slate: #1b2734;
+    --mist-warm: #4d3a32;
+
+    --ink: #e9eff5;
+    --ink-soft: rgb(233 239 245 / 0.6);
+    --ink-faint: rgb(233 239 245 / 0.32);
+    --hair: rgb(233 239 245 / 0.22);
+
+    --glass-top: rgb(255 255 255 / 0.13);
+    --glass-low: rgb(255 255 255 / 0.03);
+    --glass-edge: rgb(255 255 255 / 0.16);
+    --glass-sheen: rgb(255 255 255 / 0.22);
+    --glass-shade: rgb(0 0 0 / 0.5);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--air);
+  color: var(--ink);
+  font-family: var(--font);
+  font-weight: 300;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* ---------- the backdrop: slow, drifting, out of focus ---------- */
+
+.mist {
+  position: fixed;
+  inset: -25%;
+  z-index: -1;
+  filter: blur(70px) saturate(1.1);
+  pointer-events: none;
+}
+
+.mist i {
+  position: absolute;
+  border-radius: 50%;
+  animation: drift 46s var(--drift) infinite alternate;
+}
+
+.mist i:nth-child(1) { width: 70vmax; height: 70vmax; left: -5%;  top: 0%;  background: radial-gradient(closest-side, var(--mist-ice), transparent); }
+.mist i:nth-child(2) { width: 60vmax; height: 60vmax; right: -5%; top: 10%; background: radial-gradient(closest-side, var(--mist-milk), transparent); animation-duration: 58s; animation-delay: -20s; }
+.mist i:nth-child(3) { width: 55vmax; height: 55vmax; left: 20%;  bottom: -10%; background: radial-gradient(closest-side, var(--mist-slate), transparent); animation-duration: 64s; animation-delay: -35s; }
+.mist i:nth-child(4) { width: 34vmax; height: 34vmax; left: 38%;  top: 22%;  background: radial-gradient(closest-side, var(--mist-warm), transparent); opacity: 0.7; animation-duration: 52s; animation-delay: -10s; }
+
+@keyframes drift {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(4%, -3%, 0) scale(1.08); }
+  100% { transform: translate3d(-3%, 4%, 0) scale(0.96); }
+}
+
+/* ---------- glass: thick, frosted, pebble-shaped ---------- */
+
+.pebble {
+  position: relative;
+  background: linear-gradient(165deg, var(--glass-top), var(--glass-low) 70%);
+  -webkit-backdrop-filter: blur(34px) saturate(1.3);
+  backdrop-filter: blur(34px) saturate(1.3);
+  border: 1px solid var(--glass-edge);
+  border-radius: 58px 66px 54px 62px / 62px 54px 66px 58px;
+  box-shadow:
+    inset 0 1px 1px var(--glass-sheen),
+    inset 0 -30px 60px -30px var(--glass-sheen),
+    0 50px 90px -40px var(--glass-shade),
+    0 10px 30px -16px var(--glass-shade);
+}
+
+/* a soft highlight resting on the upper edge, like light through glass */
+.pebble::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(120% 60% at 22% 0%, var(--glass-sheen), transparent 55%);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.whisper {
+  font-style: italic;
+  font-weight: 300;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+}
+
+/* the single glowing point that pulls the eye */
+.spark {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--spark);
+  box-shadow: 0 0 6px 2px var(--spark-glow), 0 0 26px 10px var(--spark-haze);
+  transition: opacity 1.2s var(--drift), transform 1.2s var(--drift);
+}
+
+/* ---------- phone: a stone to speak into ---------- */
+
+.capture {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 28px;
+  padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
+}
+
+.capture-stone {
+  width: min(100%, 420px);
+  padding: 34px 32px 44px;
+  animation: settle 1.6s var(--drift) both;
+}
+
+.capture-stone label {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.capture-stone textarea {
+  display: block;
+  width: 100%;
+  min-height: 3.6em;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  color: var(--ink);
+  font: 200 28px/1.25 var(--font);
+  letter-spacing: -0.01em;
+  caret-color: var(--ink-soft);
+}
+
+.capture-stone textarea::placeholder {
+  color: var(--ink-faint);
+  font-style: italic;
+}
+
+/* the save action: a small pebble that overlaps the stone's edge */
+.save {
+  position: absolute;
+  right: 26px;
+  bottom: -30px;
+  width: 64px;
+  height: 60px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--glass-edge);
+  border-radius: 46% 54% 52% 48% / 54% 46% 54% 46%;
+  background: linear-gradient(160deg, var(--glass-top), var(--glass-low));
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+  box-shadow: inset 0 1px 1px var(--glass-sheen), 0 18px 34px -16px var(--glass-shade);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.6s var(--drift);
+}
+
+.save:active { transform: scale(0.94); }
+
+.capture-stone:not([data-ready]) .save .spark { opacity: 0.35; transform: scale(0.7); }
+
+.capture-stone.flare .save .spark { animation: flare 1.4s var(--drift); }
+
+/* caught words drift up and melt away */
+.ghost {
+  position: absolute;
+  left: 32px;
+  right: 32px;
+  top: 64px;
+  font: 200 28px/1.25 var(--font);
+  color: var(--ink);
+  pointer-events: none;
+  animation: melt 1.5s var(--drift) forwards;
+}
+
+.status {
+  margin: 0;
+  min-height: 1.4em;
+  opacity: 0;
+}
+
+.status.show { animation: whisper 3.6s var(--drift) forwards; }
+
+/* ---------- desk: a small floating instrument ---------- */
+
+.desk {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.panel {
+  width: min(100%, 400px);
+  padding: 32px 34px 30px;
+  animation: settle 1.6s var(--drift) both;
+}
+
+.panel header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 15px;
+  font-weight: 300;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.link::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  border: 1px solid var(--ink-faint);
+  transition: background 1s var(--drift);
+}
+
+[data-live="true"] .link::before { background: var(--ink-soft); border-color: transparent; }
+[data-live="true"] .link .off, [data-live="false"] .link .on, body:not([data-live]) .link .on { display: none; }
+
+.reading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 18px 0 2px;
+}
+
+.numeral {
+  font-size: 92px;
+  font-weight: 200;
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+}
+
+.unit {
+  font-size: 22px;
+  font-weight: 200;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+#dial {
+  display: block;
+  width: calc(100% + 68px);
+  margin: 4px -34px 0;
+  overflow: visible;
+}
+
+#dial .arc  { fill: none; stroke: var(--ink-soft); stroke-width: 0.8; }
+#dial .tick { stroke: var(--hair); stroke-width: 0.6; stroke-linecap: round; }
+#dial .tick.hit { stroke: var(--ink-soft); stroke-width: 0.9; }
+#dial .hour { fill: var(--ink-soft); font: italic 300 8.5px var(--font); text-anchor: middle; dominant-baseline: hanging; }
+#dial .spark { fill: var(--spark); filter: drop-shadow(0 0 3px var(--spark-glow)) drop-shadow(0 0 9px var(--spark-haze)); }
+#dial .spark.flare { animation: flare 1.4s var(--drift); transform-box: fill-box; transform-origin: center; }
+
+.tasks {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  max-height: 46vh;
+  overflow-y: auto;
+  scrollbar-width: none;
+  mask-image: linear-gradient(to bottom, #000 78%, transparent);
+}
+
+.tasks li {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 13px 0;
+  font-size: 18px;
+  font-weight: 300;
+  line-height: 1.35;
+}
+
+.tasks li + li { border-top: 1px solid var(--hair); }
+.tasks li span { flex: 1; overflow-wrap: anywhere; }
+.tasks li time { font-size: 12px; font-style: italic; color: var(--ink-faint); white-space: nowrap; }
+.tasks li.arrive { animation: arrive 1.4s var(--drift) both; }
+
+.empty { display: none; margin: 22px 0 6px; font-size: 20px; font-weight: 200; }
+[data-empty="true"] .empty { display: block; }
+
+/* ---------- motion: slow, fluid, nothing snaps ---------- */
+
+@keyframes settle {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); filter: blur(10px); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+
+@keyframes arrive {
+  from { opacity: 0; transform: translateY(-10px); filter: blur(12px); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+
+@keyframes melt {
+  0%   { opacity: 1; transform: none; filter: blur(0); }
+  100% { opacity: 0; transform: translateY(-46px) scale(1.04); filter: blur(14px); }
+}
+
+@keyframes flare {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(2.2); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+@keyframes whisper {
+  0%   { opacity: 0; filter: blur(6px); }
+  15%  { opacity: 1; filter: none; }
+  75%  { opacity: 1; }
+  100% { opacity: 0; filter: blur(4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+}
