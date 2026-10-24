@@ -2,6 +2,8 @@
 // listen on /events, where every change is pushed the moment it is saved.
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { createServer as createSecureServer } from "node:https";
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { extname, normalize, resolve } from "node:path";
 import { networkInterfaces } from "node:os";
@@ -17,12 +19,18 @@ const PAGES: Record<string, string> = {
   "/": "public/phone.html",
   "/phone": "public/phone.html",
   "/desk": "public/desk.html",
+  "/sw.js": "public/sw.js", // served from the root so it can look after the whole app
+  "/manifest.webmanifest": "public/manifest.webmanifest",
 };
 
 const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
+  ".webmanifest": "application/manifest+json",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".woff2": "font/woff2",
 };
 
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -118,14 +126,26 @@ function lanAddresses(): string[] {
     .map((a) => a!.address);
 }
 
-await loadTasks();
-createServer((req, res) => {
+// Set SHUCHU_CERT and SHUCHU_KEY to serve over https. Phones only let the
+// app open offline (service worker) over https or on localhost.
+const cert = process.env.SHUCHU_CERT, key = process.env.SHUCHU_KEY;
+const secure = Boolean(cert && key);
+const scheme = secure ? "https" : "http";
+
+function onRequest(req: IncomingMessage, res: ServerResponse): void {
   handle(req, res).catch((error) => {
     console.error(error);
     if (!res.headersSent) sendJson(res, 500, { error: "server error" });
   });
-}).listen(PORT, "0.0.0.0", () => {
+}
+
+await loadTasks();
+const server = secure
+  ? createSecureServer({ cert: readFileSync(cert!), key: readFileSync(key!) }, onRequest)
+  : createServer(onRequest);
+
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`Shuchu server on port ${PORT}`);
-  console.log(`  desk:  http://localhost:${PORT}/desk`);
-  for (const ip of lanAddresses()) console.log(`  phone: http://${ip}:${PORT}/phone`);
+  console.log(`  desk:  ${scheme}://localhost:${PORT}/desk`);
+  for (const ip of lanAddresses()) console.log(`  phone: ${scheme}://${ip}:${PORT}/phone`);
 });

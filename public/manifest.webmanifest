@@ -1,0 +1,16 @@
+{
+  "name": "Shuchu",
+  "short_name": "Shuchu",
+  "description": "Catch a task in under three seconds.",
+  "start_url": "/phone",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#d6dfe8",
+  "theme_color": "#d6dfe8",
+  "icons": [
+    { "src": "/public/icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/public/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/public/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

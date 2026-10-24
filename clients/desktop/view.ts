@@ -1,11 +1,15 @@
 // Presentation only: draws the waiting tasks and the day dial.
 
 import type { Task } from "../../shared/task.js";
+import { followLight, liquify } from "../glass.js";
 
 const count = document.querySelector<HTMLElement>("#count")!;
 const list = document.querySelector<HTMLOListElement>("#list")!;
 const dial = document.querySelector<SVGSVGElement>("#dial")!;
 const SVG = "http://www.w3.org/2000/svg";
+
+liquify();
+followLight();
 
 export function render(tasks: Task[], arrivedId: string | null): void {
   document.body.dataset.empty = String(tasks.length === 0);

@@ -1,57 +1,89 @@
-/* Shuchu — mist & glass.
-   Frosted surfaces floating over a soft, out-of-focus atmosphere.
-   Tokens first, then the backdrop, the glass, the phone, the desk. */
+/* Shuchu — mist & liquid glass.
+   Thick, wet-looking glass pebbles floating over a deep, out-of-focus
+   atmosphere. Tokens, backdrop, glass, then the phone and the desk. */
+
+@font-face {
+  font-family: "Urbanist";
+  font-style: normal;
+  font-weight: 200 400;
+  font-display: swap;
+  src: url("/public/fonts/urbanist-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Urbanist";
+  font-style: italic;
+  font-weight: 200 400;
+  font-display: swap;
+  src: url("/public/fonts/urbanist-latin-italic.woff2") format("woff2");
+}
 
 :root {
-  --font: "Urbanist", "Outfit", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font: "Urbanist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  /* atmosphere */
-  --air: #dce4ec;
-  --mist-ice: #bfd1e2;
-  --mist-milk: #f3f5f7;
-  --mist-slate: #9fb3c8;
-  --mist-warm: #e6c3ad;          /* the hint of warmth bleeding through */
+  /* atmosphere: icy, milky, with depth and a breath of warmth */
+  --air: #d6dfe8;
+  --mist-ice: #b3c8dc;
+  --mist-milk: #f6f8fa;
+  --mist-deep: #7f96af;
+  --mist-shadow: #5b6c80;
+  --mist-warm: #e4b89c;
 
   /* ink */
-  --ink: #1d2733;
-  --ink-soft: rgb(29 39 51 / 0.56);
-  --ink-faint: rgb(29 39 51 / 0.3);
-  --hair: rgb(29 39 51 / 0.22);
+  --ink: #18222e;
+  --ink-soft: rgb(24 34 46 / 0.58);
+  --ink-faint: rgb(24 34 46 / 0.32);
+  --hair: rgb(24 34 46 / 0.18);
 
-  /* glass */
-  --glass-top: rgb(255 255 255 / 0.58);
-  --glass-low: rgb(255 255 255 / 0.16);
-  --glass-edge: rgb(255 255 255 / 0.7);
-  --glass-sheen: rgb(255 255 255 / 0.75);
-  --glass-shade: rgb(48 70 98 / 0.22);
+  /* liquid glass */
+  --glass-top: rgb(255 255 255 / 0.4);
+  --glass-mid: rgb(255 255 255 / 0.06);
+  --glass-low: rgb(255 255 255 / 0.24);   /* light pools at the bottom of thick glass */
+  --glass-rim: rgb(255 255 255 / 0.95);
+  --glass-rim-low: rgb(255 255 255 / 0.55);
+  --glass-spec: rgb(255 255 255 / 0.55);
+  --glass-tint: rgb(214 228 242 / 0.12);
+  --glass-streak: rgb(255 255 255 / 0.85);
+  --glass-depth: rgb(46 68 96 / 0.16);
+  --glass-shade: rgb(40 60 88 / 0.28);
+  --glass-blur: 10px;
+  --glass-saturate: 1.9;
 
   /* the one warm accent: the spark */
   --spark: #fffaf2;
-  --spark-glow: rgb(255 176 128 / 0.95);
-  --spark-haze: rgb(255 196 156 / 0.45);
+  --spark-glow: rgb(255 168 116 / 0.95);
+  --spark-haze: rgb(255 190 150 / 0.5);
 
   --drift: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --air: #121921;
-    --mist-ice: #2b3d52;
-    --mist-milk: #3a4757;
-    --mist-slate: #1b2734;
-    --mist-warm: #4d3a32;
+    --air: #0f151d;
+    --mist-ice: #2a3e55;
+    --mist-milk: #445468;
+    --mist-deep: #1a2738;
+    --mist-shadow: #070b10;
+    --mist-warm: #5a3f33;
 
-    --ink: #e9eff5;
-    --ink-soft: rgb(233 239 245 / 0.6);
-    --ink-faint: rgb(233 239 245 / 0.32);
-    --hair: rgb(233 239 245 / 0.22);
+    --ink: #edf2f7;
+    --ink-soft: rgb(237 242 247 / 0.62);
+    --ink-faint: rgb(237 242 247 / 0.34);
+    --hair: rgb(237 242 247 / 0.16);
 
-    --glass-top: rgb(255 255 255 / 0.13);
-    --glass-low: rgb(255 255 255 / 0.03);
-    --glass-edge: rgb(255 255 255 / 0.16);
-    --glass-sheen: rgb(255 255 255 / 0.22);
-    --glass-shade: rgb(0 0 0 / 0.5);
+    --glass-top: rgb(255 255 255 / 0.14);
+    --glass-mid: rgb(255 255 255 / 0.03);
+    --glass-low: rgb(255 255 255 / 0.08);
+    --glass-rim: rgb(255 255 255 / 0.42);
+    --glass-rim-low: rgb(255 255 255 / 0.16);
+    --glass-spec: rgb(255 255 255 / 0.16);
+    --glass-tint: rgb(120 150 185 / 0.08);
+    --glass-streak: rgb(255 255 255 / 0.3);
+    --glass-depth: rgb(0 0 0 / 0.35);
+    --glass-shade: rgb(0 0 0 / 0.55);
+    --glass-saturate: 1.6;
   }
 }
 
@@ -69,13 +101,25 @@ body {
   overflow: hidden;
 }
 
-/* ---------- the backdrop: slow, drifting, out of focus ---------- */
+/* fine film grain, so the backdrop reads as atmosphere rather than a flat fill */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---------- the backdrop: deep, drifting, out of focus ---------- */
 
 .mist {
   position: fixed;
   inset: -25%;
-  z-index: -1;
-  filter: blur(70px) saturate(1.1);
+  z-index: -2;
+  filter: blur(60px) saturate(1.15);
   pointer-events: none;
 }
 
@@ -85,42 +129,127 @@ body {
   animation: drift 46s var(--drift) infinite alternate;
 }
 
-.mist i:nth-child(1) { width: 70vmax; height: 70vmax; left: -5%;  top: 0%;  background: radial-gradient(closest-side, var(--mist-ice), transparent); }
-.mist i:nth-child(2) { width: 60vmax; height: 60vmax; right: -5%; top: 10%; background: radial-gradient(closest-side, var(--mist-milk), transparent); animation-duration: 58s; animation-delay: -20s; }
-.mist i:nth-child(3) { width: 55vmax; height: 55vmax; left: 20%;  bottom: -10%; background: radial-gradient(closest-side, var(--mist-slate), transparent); animation-duration: 64s; animation-delay: -35s; }
-.mist i:nth-child(4) { width: 34vmax; height: 34vmax; left: 38%;  top: 22%;  background: radial-gradient(closest-side, var(--mist-warm), transparent); opacity: 0.7; animation-duration: 52s; animation-delay: -10s; }
+.mist i:nth-child(1) { width: 70vmax; height: 70vmax; left: -8%; top: -4%; background: radial-gradient(closest-side, var(--mist-ice), transparent); }
+.mist i:nth-child(2) { width: 58vmax; height: 58vmax; right: -6%; top: 6%; background: radial-gradient(closest-side, var(--mist-milk), transparent); animation-duration: 58s; animation-delay: -20s; }
+.mist i:nth-child(3) { width: 52vmax; height: 52vmax; left: 16%; bottom: -12%; background: radial-gradient(closest-side, var(--mist-deep), transparent); animation-duration: 64s; animation-delay: -35s; }
+.mist i:nth-child(4) { width: 30vmax; height: 30vmax; left: 40%; top: 18%; background: radial-gradient(closest-side, var(--mist-warm), transparent); animation-duration: 52s; animation-delay: -10s; }
+.mist i:nth-child(5) { width: 26vmax; height: 34vmax; left: 30%; top: 30%; background: radial-gradient(closest-side, var(--mist-shadow), transparent); opacity: 0.55; animation-duration: 70s; animation-delay: -42s; }
 
 @keyframes drift {
   0%   { transform: translate3d(0, 0, 0) scale(1); }
-  50%  { transform: translate3d(4%, -3%, 0) scale(1.08); }
-  100% { transform: translate3d(-3%, 4%, 0) scale(0.96); }
+  50%  { transform: translate3d(5%, -4%, 0) scale(1.1); }
+  100% { transform: translate3d(-4%, 5%, 0) scale(0.94); }
 }
 
-/* ---------- glass: thick, frosted, pebble-shaped ---------- */
+/* out-of-focus pebbles floating far behind, for depth and something to refract */
+.stones {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
 
-.pebble {
+.stones b {
+  position: absolute;
+  border-radius: 46% 54% 50% 50% / 56% 44% 56% 44%;
+  background:
+    radial-gradient(70% 60% at 35% 25%, var(--glass-rim), transparent 60%),
+    linear-gradient(160deg, var(--glass-top), var(--glass-mid));
+  box-shadow: inset 0 -10px 24px -8px var(--glass-rim-low), 0 30px 50px -30px var(--glass-shade);
+  filter: blur(7px);
+  opacity: 0.75;
+  animation: float 34s var(--drift) infinite alternate;
+}
+
+.stones b:nth-child(1) { width: 22vmin; height: 20vmin; left: 8%;  top: 14%; animation-delay: -6s; }
+.stones b:nth-child(2) { width: 30vmin; height: 26vmin; right: 6%; bottom: 10%; filter: blur(12px); animation-duration: 44s; }
+.stones b:nth-child(3) { width: 14vmin; height: 13vmin; right: 16%; top: 12%; filter: blur(4px); animation-duration: 28s; animation-delay: -14s; }
+.stones b:nth-child(4) { width: 18vmin; height: 17vmin; left: 14%; bottom: 14%; filter: blur(9px); animation-duration: 38s; animation-delay: -20s; }
+
+@keyframes float {
+  0%   { transform: translate3d(0, 0, 0) rotate(0deg); }
+  100% { transform: translate3d(3vmin, -4vmin, 0) rotate(14deg); }
+}
+
+/* ---------- liquid glass ---------- */
+
+.glass {
   position: relative;
-  background: linear-gradient(165deg, var(--glass-top), var(--glass-low) 70%);
-  -webkit-backdrop-filter: blur(34px) saturate(1.3);
-  backdrop-filter: blur(34px) saturate(1.3);
-  border: 1px solid var(--glass-edge);
-  border-radius: 58px 66px 54px 62px / 62px 54px 66px 58px;
+  isolation: isolate;
+  border-radius: 60px 68px 56px 64px / 64px 56px 68px 60px;
+  background:
+    radial-gradient(34% 5% at 30% 3.5%, var(--glass-streak), transparent),  /* the wet streak of reflected sky */
+    radial-gradient(80% 60% at var(--lx, 24%) var(--ly, -6%), var(--glass-spec), transparent 62%),
+    linear-gradient(172deg, var(--glass-top) 0%, var(--glass-mid) 46%, var(--glass-low) 100%),
+    var(--glass-tint);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) brightness(1.04);
+  /* bend first, then frost: the order real glass works in (and the only one Chromium clips cleanly) */
+  backdrop-filter: var(--refract,) blur(var(--glass-blur)) saturate(var(--glass-saturate)) brightness(1.04);
   box-shadow:
-    inset 0 1px 1px var(--glass-sheen),
-    inset 0 -30px 60px -30px var(--glass-sheen),
-    0 50px 90px -40px var(--glass-shade),
-    0 10px 30px -16px var(--glass-shade);
+    inset 0 2px 1px -1px var(--glass-rim),           /* bright upper lip */
+    inset 2px 0 2px -2px var(--glass-rim-low),
+    inset 0 -2px 2px -1px var(--glass-rim-low),      /* lower lip catching light */
+    inset 0 22px 30px -24px var(--glass-rim),        /* thickness under the top edge */
+    inset 0 -34px 44px -30px var(--glass-rim-low),   /* light pooling at the bottom */
+    inset -10px -12px 24px -14px var(--glass-depth),  /* the far side, turning away from the light */
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 26px 50px -22px var(--glass-shade),
+    0 70px 120px -60px var(--glass-shade);
+  transition: transform 0.9s var(--spring);
 }
 
-/* a soft highlight resting on the upper edge, like light through glass */
-.pebble::before {
+/* the rim: a hairline that is brightest where light hits, gone where it doesn't */
+.glass::before {
   content: "";
   position: absolute;
   inset: 0;
+  z-index: -1;
+  padding: 1.2px;
   border-radius: inherit;
-  background: radial-gradient(120% 60% at 22% 0%, var(--glass-sheen), transparent 55%);
-  opacity: 0.55;
+  background: linear-gradient(
+    140deg,
+    var(--glass-rim) 0%, transparent 28%, transparent 62%, var(--glass-rim-low) 86%, var(--glass-rim) 100%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
   pointer-events: none;
+}
+
+/* a caustic glow along the lower inside, like light focused through a lens */
+.glass::after {
+  content: "";
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: 3%;
+  height: 26%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--glass-rim-low), transparent);
+  filter: blur(10px);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+/* the surfaces breathe very slowly, like something liquid at rest */
+.breathe { animation: breathe 18s ease-in-out infinite alternate; }
+
+@keyframes breathe {
+  0%   { border-radius: 60px 68px 56px 64px / 64px 56px 68px 60px; }
+  50%  { border-radius: 66px 58px 64px 56px / 58px 66px 58px 66px; }
+  100% { border-radius: 58px 64px 68px 58px / 66px 60px 56px 64px; }
+}
+
+.squish { animation: squish 0.9s var(--drift); }
+
+@keyframes squish {
+  0%   { transform: scale(1, 1); }
+  22%  { transform: scale(1.14, 0.86); }
+  42%  { transform: scale(0.92, 1.08); }
+  62%  { transform: scale(1.04, 0.97); }
+  80%  { transform: scale(0.99, 1.01); }
+  100% { transform: scale(1, 1); }
 }
 
 .whisper {
@@ -134,12 +263,18 @@ body {
 /* the single glowing point that pulls the eye */
 .spark {
   display: block;
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--spark);
-  box-shadow: 0 0 6px 2px var(--spark-glow), 0 0 26px 10px var(--spark-haze);
+  box-shadow: 0 0 6px 2px var(--spark-glow), 0 0 28px 12px var(--spark-haze), 0 0 60px 24px var(--spark-haze);
+  animation: glow 5s ease-in-out infinite alternate;
   transition: opacity 1.2s var(--drift), transform 1.2s var(--drift);
+}
+
+@keyframes glow {
+  from { filter: brightness(0.92); }
+  to   { filter: brightness(1.12); }
 }
 
 /* ---------- phone: a stone to speak into ---------- */
@@ -149,14 +284,14 @@ body {
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 28px;
+  gap: 30px;
   padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
 }
 
 .capture-stone {
   width: min(100%, 420px);
-  padding: 34px 32px 44px;
-  animation: settle 1.6s var(--drift) both;
+  padding: 36px 32px 48px;
+  animation: settle 1.8s var(--drift) both, breathe 18s ease-in-out infinite alternate;
 }
 
 .capture-stone label {
@@ -176,7 +311,7 @@ body {
   color: var(--ink);
   font: 200 28px/1.25 var(--font);
   letter-spacing: -0.01em;
-  caret-color: var(--ink-soft);
+  caret-color: var(--spark-glow);
 }
 
 .capture-stone textarea::placeholder {
@@ -184,29 +319,25 @@ body {
   font-style: italic;
 }
 
-/* the save action: a small pebble that overlaps the stone's edge */
+/* the save action: a small, thick pebble resting on the stone's edge */
 .save {
   position: absolute;
   right: 26px;
-  bottom: -30px;
-  width: 64px;
-  height: 60px;
+  bottom: -32px;
+  width: 70px;
+  height: 64px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--glass-edge);
+  padding: 0;
+  border: 0;
   border-radius: 46% 54% 52% 48% / 54% 46% 54% 46%;
-  background: linear-gradient(160deg, var(--glass-top), var(--glass-low));
-  -webkit-backdrop-filter: blur(24px);
-  backdrop-filter: blur(24px);
-  box-shadow: inset 0 1px 1px var(--glass-sheen), 0 18px 34px -16px var(--glass-shade);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: transform 0.6s var(--drift);
 }
 
-.save:active { transform: scale(0.94); }
+.save:focus-visible { outline: 1px solid var(--ink-faint); outline-offset: 6px; }
 
-.capture-stone:not([data-ready]) .save .spark { opacity: 0.35; transform: scale(0.7); }
+.capture-stone:not([data-ready]) .save .spark { opacity: 0.3; transform: scale(0.65); }
 
 .capture-stone.flare .save .spark { animation: flare 1.4s var(--drift); }
 
@@ -215,11 +346,11 @@ body {
   position: absolute;
   left: 32px;
   right: 32px;
-  top: 64px;
+  top: 66px;
   font: 200 28px/1.25 var(--font);
   color: var(--ink);
   pointer-events: none;
-  animation: melt 1.5s var(--drift) forwards;
+  animation: melt 1.6s var(--drift) forwards;
 }
 
 .status {
@@ -229,6 +360,15 @@ body {
 }
 
 .status.show { animation: whisper 3.6s var(--drift) forwards; }
+
+.holding {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  margin: 0;
+  text-align: center;
+}
 
 /* ---------- desk: a small floating instrument ---------- */
 
@@ -241,8 +381,8 @@ body {
 
 .panel {
   width: min(100%, 400px);
-  padding: 32px 34px 30px;
-  animation: settle 1.6s var(--drift) both;
+  padding: 34px 36px 30px;
+  animation: settle 1.8s var(--drift) both, breathe 18s ease-in-out infinite alternate;
 }
 
 .panel header {
@@ -279,10 +419,11 @@ body {
 }
 
 .numeral {
-  font-size: 92px;
+  font-size: 96px;
   font-weight: 200;
   line-height: 0.9;
   letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
 }
 
 .unit {
@@ -290,13 +431,13 @@ body {
   font-weight: 200;
   color: var(--ink-faint);
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
 }
 
 #dial {
   display: block;
-  width: calc(100% + 68px);
-  margin: 4px -34px 0;
+  width: calc(100% + 72px);
+  margin: 4px -36px 0;
   overflow: visible;
 }
 
@@ -328,9 +469,9 @@ body {
 }
 
 .tasks li + li { border-top: 1px solid var(--hair); }
-.tasks li span { flex: 1; overflow-wrap: anywhere; }
+.tasks li span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .tasks li time { font-size: 12px; font-style: italic; color: var(--ink-faint); white-space: nowrap; }
-.tasks li.arrive { animation: arrive 1.4s var(--drift) both; }
+.tasks li.arrive { animation: arrive 1.6s var(--drift) both; }
 
 .empty { display: none; margin: 22px 0 6px; font-size: 20px; font-weight: 200; }
 [data-empty="true"] .empty { display: block; }
@@ -338,23 +479,24 @@ body {
 /* ---------- motion: slow, fluid, nothing snaps ---------- */
 
 @keyframes settle {
-  from { opacity: 0; transform: translateY(14px) scale(0.985); filter: blur(10px); }
+  from { opacity: 0; transform: translateY(18px) scale(0.97); filter: blur(14px); }
   to   { opacity: 1; transform: none; filter: none; }
 }
 
 @keyframes arrive {
-  from { opacity: 0; transform: translateY(-10px); filter: blur(12px); }
-  to   { opacity: 1; transform: none; filter: none; }
+  0%   { opacity: 0; transform: translateY(-14px) scale(0.98); filter: blur(14px); }
+  60%  { opacity: 1; filter: blur(0); }
+  100% { opacity: 1; transform: none; filter: none; }
 }
 
 @keyframes melt {
   0%   { opacity: 1; transform: none; filter: blur(0); }
-  100% { opacity: 0; transform: translateY(-46px) scale(1.04); filter: blur(14px); }
+  100% { opacity: 0; transform: translateY(-52px) scale(1.05); filter: blur(16px); }
 }
 
 @keyframes flare {
   0%   { transform: scale(1); }
-  30%  { transform: scale(2.2); opacity: 1; }
+  30%  { transform: scale(2.4); filter: brightness(1.3); }
   100% { transform: scale(1); }
 }
 
