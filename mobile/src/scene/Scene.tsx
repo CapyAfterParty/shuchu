@@ -5,14 +5,13 @@ import { Canvas, Fill, Shader, Skia, useClock } from '@shopify/react-native-skia
 import { useMemo } from 'react';
 import { PixelRatio, StyleSheet, useWindowDimensions } from 'react-native';
 import {
-  SensorType,
-  useAnimatedSensor,
   useDerivedValue,
   useFrameCallback,
   useSharedValue,
 } from 'react-native-reanimated';
 import { mist, night, type Rgb } from '../theme/tokens';
 import { RIPPLES, sceneShader, SLOTS, SPARKS } from './shader';
+import { useRotation } from './useRotation';
 import { haze, motion, ripples, sceneClock, slots, sparks, themeBlend } from './world';
 
 const effect = Skia.RuntimeEffect.Make(sceneShader);
@@ -24,7 +23,7 @@ export function Scene() {
   const { width, height } = useWindowDimensions();
   const density = PixelRatio.get();
   const clock = useClock();
-  const rotation = useAnimatedSensor(SensorType.ROTATION, { interval: 16 });
+  const rotation = useRotation();
 
   // Light follows tilt relative to however you naturally hold the phone:
   // a slow average becomes "rest", quick movements swing the light.
@@ -60,7 +59,7 @@ export function Scene() {
     lastClock.value = clock.value;
     speed.value += (motion.value - speed.value) * 0.03;
     drift.value += dt * (0.25 + 0.75 * speed.value);
-    const r = rotation.sensor.value;
+    const r = rotation.value;
     if (!r || (r.pitch === 0 && r.roll === 0 && r.yaw === 0)) return;
     const s = rest.value;
     const base = s.ready ? s : { pitch: r.pitch, roll: r.roll, ready: true };
