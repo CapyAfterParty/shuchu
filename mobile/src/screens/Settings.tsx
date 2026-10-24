@@ -76,6 +76,7 @@ export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay:
           <View style={styles.addressRow}>
             <Icon name="link" size={18} color={p.inkFaint} />
             <TextInput
+              underlineColorAndroid="transparent"
               value={address}
               onChangeText={setAddress}
               onEndEditing={() => { updateSettings({ serverUrl: address.trim() || null }); void test(); }}

@@ -190,7 +190,13 @@ float3 lightGlass(float3 g, float2 n, float d, float edge, float bend, float pea
   float away = max(dot(n, -light), 0.0);
   float3 R = reflect(-L, N);
   float spec = pow(max(R.z, 0.0), 90.0);
-  g += float3(1.0) * spec * 0.85;
+  g += float3(1.0) * spec * 0.95;
+  // a broad wet sheen, and a second, warmer glint from light bouncing back
+  // up from below: the twin highlights of a drop of water
+  g += milk * pow(max(R.z, 0.0), 10.0) * 0.10 * (1.0 - night * 0.4);
+  float3 L2 = normalize(float3(-light * 0.7, 0.75));
+  float spec2 = pow(max(reflect(-L2, N).z, 0.0), 70.0);
+  g += mix(float3(1.0), sparkColor, 0.35) * spec2 * 0.38;
   g += milk * pow(edge, 4.0) * lit * 0.42;
 
   // light focused through the body lands on the far inner edge
@@ -198,6 +204,9 @@ float3 lightGlass(float3 g, float2 n, float d, float edge, float bend, float pea
   g += mix(milk, sparkColor, 0.18 + warm * 0.3) * band * away * (0.30 - night * 0.08);
   // the thick far edge swallows a little light
   g *= 1.0 - 0.13 * edge * edge * away;
+
+  // a dark line just inside the rim: the edge of thick glass seen side-on
+  g *= 1.0 - 0.16 * exp(-pow((-d - 3.2) / 1.8, 2.0)) * (0.5 + 0.5 * away);
 
   // hairline rim, brightest where it faces the light
   float rim = exp(min(d, 0.0) / 1.1);
@@ -221,14 +230,14 @@ float3 baseLayer(float2 p) {
     float2 n = normalAt(p, d, 0.0);
     float edge = 1.0 - clamp(-d / 30.0, 0.0, 1.0);
     float bend = edge * edge * (0.6 + 0.4 * edge);
-    float2 off = -n * bend * 34.0;
+    float2 off = -n * bend * 42.0;
     float frost = 15.0;
     float3 g;
     if (quality > 0.5) {
       // red, green and blue bend by slightly different amounts
       g.r = atmosphere(rippled(p + off * 1.00), frost).r;
-      g.g = atmosphere(rippled(p + off * 1.08), frost).g;
-      g.b = atmosphere(rippled(p + off * 1.17), frost).b;
+      g.g = atmosphere(rippled(p + off * 1.10), frost).g;
+      g.b = atmosphere(rippled(p + off * 1.22), frost).b;
     } else {
       g = atmosphere(p + off * 1.06, frost);
     }

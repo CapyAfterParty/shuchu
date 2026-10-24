@@ -21,7 +21,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import type { Task } from '../../../shared/task';
 import { feel } from '../feel/feel';
 import type { Frame } from '../scene/Glass';
-import { claimSlot, releaseSlot, ripple, writeShape } from '../scene/world';
+import { claimSlot, releaseSlot, ripple, sceneClock, writeShape } from '../scene/world';
 import { spring } from '../theme/tokens';
 import { Txt } from '../ui/Txt';
 
@@ -216,7 +216,9 @@ function Pebble({
     const k = presence.value;
     writeShape(slot, {
       cx: b.x + b.w / 2 + px,
-      cy: b.y + b.h / 2 - 12 + py + drag.value * (1 + (order % 3) * 0.15),
+      // resting pebbles float, each on its own slow swell
+      cy: b.y + b.h / 2 - 12 + py + drag.value * (1 + (order % 3) * 0.15)
+        + Math.sin(sceneClock.value * 0.0011 + seed * 6.28) * 1.8 * (landed.value ? 1 : 0),
       hw: target.w / 2,
       hh: target.h / 2,
       radius: Math.min(target.w, target.h) / 2,

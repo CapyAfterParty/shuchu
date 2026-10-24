@@ -111,7 +111,8 @@ export function Glass({
   const contentStyle = useAnimatedStyle(() => {
     const p = read(presence, 1);
     return {
-      opacity: fadeContent ? Math.max(0, Math.min(1, (p - 0.55) / 0.45)) : 1,
+      // content appears once the glass is nearly formed, so it never floats outside it
+      opacity: fadeContent ? Math.max(0, Math.min(1, (p - 0.78) / 0.22)) : 1,
       transform: [
         { translateX: read(dx, 0) },
         { translateY: read(dy, 0) },

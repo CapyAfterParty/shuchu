@@ -5,6 +5,7 @@ import { Pressable, type StyleProp, StyleSheet, type ViewStyle } from 'react-nat
 import { useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated';
 import { feel } from '../feel/feel';
 import { Glass, type Frame } from '../scene/Glass';
+import { ripple } from '../scene/world';
 import { spring } from '../theme/tokens';
 
 export interface GlassButtonProps {
@@ -53,8 +54,10 @@ export function GlassButton({
       disabled={disabled}
       hitSlop={hitSlop}
       style={outer}
-      onPressIn={() => {
+      onPressIn={(e) => {
         feel.touch();
+        // a ring of light spreads through the mist under your finger
+        ripple(e.nativeEvent.pageX, e.nativeEvent.pageY, 0.45);
         sx.value = withSpring(1.07, spring.touch);
         sy.value = withSpring(0.9, spring.touch);
       }}

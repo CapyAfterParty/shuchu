@@ -55,7 +55,8 @@ interface Props {
 export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props) {
   const p = useTheme();
   const insets = useSafeAreaInsets();
-  const keyboard = useAnimatedKeyboard();
+  // Android draws edge to edge, so both system bars are translucent
+  const keyboard = useAnimatedKeyboard({ isStatusBarTranslucentAndroid: true, isNavigationBarTranslucentAndroid: true });
   const input = useRef<ComponentRef<typeof TextInput>>(null);
   const [text, setText] = useState('');
   const [arriving, setArriving] = useState<string | null>(null);
@@ -159,9 +160,14 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
           >
             <Txt variant="whisper" tone="soft" style={styles.label}>{promptFor(now.getHours())}</Txt>
             <TextInput
+              underlineColorAndroid="transparent"
               ref={input}
               value={text}
-              onChangeText={setText}
+              onChangeText={(t) => {
+                // the stone breathes a little with every keystroke
+                if (t.length > text.length) sy.value = withSequence(withTiming(1.012, { duration: 70 }), withSpring(1, spring.jelly));
+                setText(t);
+              }}
               placeholder={placeholder}
               placeholderTextColor={p.inkFaint}
               multiline

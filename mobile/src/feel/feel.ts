@@ -6,15 +6,34 @@ import * as Haptics from 'expo-haptics';
 import { Platform } from 'react-native';
 import { settings } from '../data/settings';
 
-const { ImpactFeedbackStyle: Impact } = Haptics;
+const { ImpactFeedbackStyle: Impact, AndroidHaptics: A } = Haptics;
 const canBuzz = Platform.OS !== 'web';
+const isAndroid = Platform.OS === 'android';
 
 function level() {
   return settings.get().haptics;
 }
 
+// Android has crisp system haptics (the same ones its keyboard and dials use);
+// they feel far better than raw vibration. Older devices fall back to impacts.
+const ANDROID: Partial<Record<Haptics.ImpactFeedbackStyle, Haptics.AndroidHaptics>> = {
+  [Impact.Soft]: A.Virtual_Key,
+  [Impact.Light]: A.Context_Click,
+  [Impact.Medium]: A.Confirm,
+  [Impact.Heavy]: A.Long_Press,
+  [Impact.Rigid]: A.Clock_Tick,
+};
+
+function android(type: Haptics.AndroidHaptics, fallback: () => void): void {
+  void Haptics.performAndroidHapticsAsync(type).catch(fallback);
+}
+
 function impact(style: Haptics.ImpactFeedbackStyle): void {
   if (!canBuzz || level() === 'off') return;
+  if (isAndroid) {
+    const type = ANDROID[level() === 'gentle' ? Impact.Soft : style];
+    if (type) return android(type, () => void Haptics.impactAsync(style).catch(() => {}));
+  }
   const gentle = level() === 'gentle';
   const soften: Partial<Record<Haptics.ImpactFeedbackStyle, Haptics.ImpactFeedbackStyle>> = {
     [Impact.Heavy]: Impact.Medium,
@@ -36,6 +55,7 @@ export const feel = {
   /** One notch on a dial. */
   tick() {
     if (!canBuzz || level() === 'off') return;
+    if (isAndroid) return android(A.Segment_Tick, () => void Haptics.selectionAsync().catch(() => {}));
     void Haptics.selectionAsync().catch(() => {});
   },
   /** A thought leaves your head: a soft press, then the pebble pinching off. */
@@ -61,6 +81,7 @@ export const feel = {
   /** Something completed, without fanfare. */
   done() {
     if (!canBuzz || level() === 'off') return;
+    if (isAndroid) return android(A.Confirm, () => impact(Impact.Medium));
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   },
   /** Arrival at the end of onboarding. */
@@ -75,6 +96,7 @@ export const feel = {
   /** A gentle no. */
   nope() {
     if (!canBuzz || level() === 'off') return;
+    if (isAndroid) return android(A.Reject, () => impact(Impact.Rigid));
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
   },
 };

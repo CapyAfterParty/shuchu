@@ -75,6 +75,7 @@ export function Detail({ id, onClose }: { id: string; onClose: () => void }) {
         <Reveal delay={220} style={styles.block}>
           <Txt variant="caps" tone="soft">WHAT IT IS</Txt>
           <TextInput
+              underlineColorAndroid="transparent"
             value={title}
             onChangeText={setTitle}
             onEndEditing={saveTitle}
@@ -118,6 +119,7 @@ export function Detail({ id, onClose }: { id: string; onClose: () => void }) {
           <View style={styles.stepRow}>
             <View style={styles.sparkDot} />
             <TextInput
+              underlineColorAndroid="transparent"
               value={step}
               onChangeText={setStep}
               onEndEditing={saveStep}
@@ -187,7 +189,7 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 26, paddingBottom: 80 },
   quote: { fontSize: 34, lineHeight: 40, marginTop: 8 },
   block: { marginTop: 30 },
-  title: { ...T.title, padding: 0, marginTop: 8, marginBottom: 12 },
+  title: { ...T.title, padding: 0, marginTop: 8, marginBottom: 12, textAlignVertical: 'top' },
   hair: { height: StyleSheet.hairlineWidth },
   reading: { marginBottom: -6 },
   numberRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 },
@@ -195,7 +197,7 @@ const styles = StyleSheet.create({
   unit: { fontFamily: font.thin, letterSpacing: 1 },
   stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginTop: 10, marginBottom: 12 },
   sparkDot: { width: 7, height: 7, borderRadius: 4, marginTop: 9, backgroundColor: '#FFC9A3', shadowColor: '#FFB27E', shadowOpacity: 0.9, shadowRadius: 6, shadowOffset: { width: 0, height: 0 } },
-  step: { ...T.body, flex: 1, padding: 0 },
+  step: { ...T.body, flex: 1, padding: 0, textAlignVertical: 'top' },
   actions: { flexDirection: 'row', gap: 12, marginTop: 34 },
   primary: { flex: 1, height: 54 },
   secondary: { flex: 1, height: 54 },

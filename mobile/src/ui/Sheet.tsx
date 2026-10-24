@@ -45,7 +45,8 @@ export function Sheet({ open, onClose, children, recede = false }: Props) {
     if (open) {
       setMounted(true);
       dy.value = 0;
-      presence.value = withSpring(1, spring.sheet);
+      // grows past its size for a moment, like liquid, then settles
+      presence.value = withSpring(1, { damping: 15, stiffness: 150, mass: 1 });
     } else {
       presence.value = withTiming(0, { duration: 420 });
       const t = setTimeout(() => setMounted(false), 440);

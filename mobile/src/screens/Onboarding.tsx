@@ -260,6 +260,7 @@ function CatchBeat({ hero, pebble, spark, onNext }: { hero: FreeShape; pebble: F
         <Reveal delay={700} show={!caught}>
           <Txt variant="whisper" tone="soft" style={{ marginBottom: 10 }}>your first thought</Txt>
           <TextInput
+              underlineColorAndroid="transparent"
             ref={input}
             value={text}
             onChangeText={setText}

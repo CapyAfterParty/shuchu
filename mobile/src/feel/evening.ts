@@ -31,13 +31,22 @@ export async function syncEvening(): Promise<void> {
     if (!s.eveningOn || !s.onboarded) return;
     const granted = (await Notifications.getPermissionsAsync()).granted;
     if (!granted) return;
+    if (Platform.OS === 'android') {
+      // Android 8+ shows nothing without a channel; this one is quiet by design
+      await Notifications.setNotificationChannelAsync('evening', {
+        name: 'Evening question',
+        importance: Notifications.AndroidImportance.DEFAULT,
+        sound: null,
+        vibrationPattern: [0, 40],
+      });
+    }
     await Notifications.scheduleNotificationAsync({
       content: {
         title: PROMPTS[new Date().getDate() % PROMPTS.length],
         body: 'Catch it here so it stops circling.',
         sound: false,
       },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: s.eveningHour, minute: s.eveningMinute },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: s.eveningHour, minute: s.eveningMinute, channelId: 'evening' },
     });
   } catch {
     // Notifications are optional; capture never depends on them.

@@ -2,9 +2,10 @@
 
 Catch a thought in under three seconds. It waits at your desk.
 
-## See it on your iPhone
+## See it on your phone (Android or iPhone)
 
-You need [Node.js](https://nodejs.org) 22+ on your computer and **Expo Go** (App Store) on the phone. Both on the same Wi-Fi.
+You need [Node.js](https://nodejs.org) 22+ on your computer and **Expo Go** on the phone
+([Google Play](https://play.google.com/store/apps/details?id=host.exp.exponent) or the App Store). Both on the same Wi-Fi.
 
 ```sh
 # 1. the desk server (from the repo root)
@@ -17,7 +18,7 @@ npm install
 npx expo start
 ```
 
-Scan the QR code with the iPhone camera. It opens in Expo Go. The app finds the desk server on the same computer by itself; you can also enter an address in Settings → Your desk.
+Android: open Expo Go and tap "Scan QR code". iPhone: scan it with the camera. If the phone can't reach your computer (some office or campus networks block it), run `npx expo start --tunnel` instead. The app finds the desk server on the same computer by itself; you can also enter an address in Settings → Your desk.
 
 Without a server the app still works: every thought is kept on the phone and sent once a desk is linked.
 

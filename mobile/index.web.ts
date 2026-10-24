@@ -3,4 +3,16 @@
 import { LoadSkiaWeb } from '@shopify/react-native-skia/lib/module/web';
 
 // relative, so the web build also works from a sub-folder
-LoadSkiaWeb({ locateFile: (file: string) => file }).then(() => require('expo-router/entry'));
+LoadSkiaWeb({ locateFile: (file: string) => file })
+  .then(() => require('expo-router/entry'))
+  .catch(() => {
+    // Some embedded browsers block WebAssembly; say so instead of a blank page.
+    const root = document.getElementById('root');
+    if (root) {
+      root.innerHTML =
+        '<div style="margin:auto;max-width:300px;padding:24px;text-align:center;font:300 16px/1.5 system-ui;color:#17212c">' +
+        'This preview needs WebGL and WebAssembly, which this browser blocked.<br><br>' +
+        'Open it in Chrome or Safari, or run the app with Expo Go.</div>';
+      root.style.background = '#d9e2eb';
+    }
+  });
