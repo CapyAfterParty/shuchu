@@ -8,7 +8,7 @@ import { readFile } from "node:fs/promises";
 import { extname, normalize, resolve } from "node:path";
 import { networkInterfaces } from "node:os";
 import { fileURLToPath } from "node:url";
-import { isNewTask, taskFrom, type SyncEvent } from "../shared/task.js";
+import { cleanPatch, isNewTask, taskFrom, type SyncEvent } from "../shared/task.js";
 import { allTasks, getTask, loadTasks, putTask } from "./store.js";
 
 const PORT = Number(process.env.PORT ?? 4545);
@@ -35,9 +35,20 @@ const TYPES: Record<string, string> = {
 
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const path = new URL(req.url ?? "/", "http://x").pathname;
+  // Any Shuchu app may talk to this server, wherever it is served from.
+  res.setHeader("access-control-allow-origin", "*");
+  res.setHeader("access-control-allow-methods", "GET, POST, PATCH, OPTIONS");
+  res.setHeader("access-control-allow-headers", req.headers["access-control-request-headers"] ?? "content-type");
+  if (req.method === "OPTIONS") {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
 
   if (req.method === "POST" && path === "/tasks") return createTask(req, res);
   if (req.method === "GET" && path === "/tasks") return sendJson(res, 200, allTasks());
+  if (req.method === "PATCH" && path.startsWith("/tasks/")) return updateTask(req, res, path.slice(7));
+  if (req.method === "GET" && path === "/ping") return sendJson(res, 200, { ok: true, at: Date.now() });
   if (req.method === "GET" && path === "/events") return listen(req, res);
   if (req.method === "GET" && PAGES[path]) return sendFile(res, PAGES[path]);
   if (req.method === "GET" && path.startsWith("/public/")) return sendFile(res, path.slice(1));
@@ -61,6 +72,23 @@ async function createTask(req: IncomingMessage, res: ServerResponse): Promise<vo
   await putTask(task);
   broadcast({ type: "task", task });
   sendJson(res, 201, task);
+}
+
+async function updateTask(req: IncomingMessage, res: ServerResponse, id: string): Promise<void> {
+  const existing = getTask(decodeURIComponent(id));
+  if (!existing) return sendJson(res, 404, { error: "no such task" });
+  let patch;
+  try {
+    patch = cleanPatch(JSON.parse(await readBody(req)));
+  } catch {
+    return sendJson(res, 400, { error: "bad json" });
+  }
+  if (!patch) return sendJson(res, 400, { error: "bad patch" });
+
+  const task = { ...existing, ...patch };
+  await putTask(task);
+  broadcast({ type: "task", task });
+  sendJson(res, 200, task);
 }
 
 function listen(req: IncomingMessage, res: ServerResponse): void {

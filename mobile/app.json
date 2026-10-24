@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Shuchu",
+    "slug": "shuchu",
+    "scheme": "shuchu",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#DCE5EE",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.shuchu",
+      "infoPlist": {
+        "NSMotionUsageDescription": "Shuchu tilts its light with your phone, so the glass feels real."
+      }
+    },
+    "android": {
+      "package": "app.shuchu",
+      "adaptiveIcon": {
+        "backgroundColor": "#DCE5EE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "output": "single",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-audio",
+      [
+        "expo-notifications",
+        { "color": "#DCE5EE" }
+      ]
+    ]
+  }
+}
