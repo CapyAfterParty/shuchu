@@ -92,11 +92,12 @@ export function writeSpark(i: number, x: number, y: number, intensity: number, r
   sparks[i].value = [x, y, intensity, radius];
 }
 
-let nextRipple = 0;
+// A shared value, not a plain variable: worklets can't reassign captured variables.
+const nextRipple = makeMutable(0);
 /** A ripple through the atmosphere, e.g. where a pebble lands. */
 export function ripple(x: number, y: number, strength = 1): void {
   'worklet';
-  const i = nextRipple;
-  nextRipple = (nextRipple + 1) % RIPPLES;
+  const i = nextRipple.value;
+  nextRipple.value = (i + 1) % RIPPLES;
   ripples[i].value = [x, y, sceneClock.value, strength];
 }

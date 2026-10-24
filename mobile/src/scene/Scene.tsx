@@ -40,14 +40,20 @@ export function Scene() {
   const frameAvg = useSharedValue(16);
   const quality = useSharedValue(1);
   const qualityHold = useSharedValue(0);
+  const vsync = useSharedValue(1000); // the display's own frame interval, learned
 
   useFrameCallback((info) => {
     const ft = info.timeSincePreviousFrame ?? 16;
-    if (ft > 0 && ft < 250) frameAvg.value += (ft - frameAvg.value) * 0.05;
+    if (ft > 0 && ft < 250) {
+      frameAvg.value += (ft - frameAvg.value) * 0.05;
+      if (ft > 4) vsync.value = Math.min(vsync.value * 1.0005, ft);
+    }
     qualityHold.value += 1;
     if (qualityHold.value > 90) {
-      if (quality.value === 1 && frameAvg.value > 24) { quality.value = 0; qualityHold.value = 0; }
-      else if (quality.value === 0 && frameAvg.value < 13) { quality.value = 1; qualityHold.value = 0; }
+      // relative to this display's refresh, so 60 Hz and 120 Hz phones both recover
+      const v = Math.min(vsync.value, 17);
+      if (quality.value === 1 && frameAvg.value > v * 1.6) { quality.value = 0; qualityHold.value = 0; }
+      else if (quality.value === 0 && frameAvg.value < v * 1.2) { quality.value = 1; qualityHold.value = 0; }
     }
     sceneClock.value = clock.value;
     const dt = lastClock.value ? Math.min(clock.value - lastClock.value, 100) : 0;

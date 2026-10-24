@@ -1,7 +1,7 @@
 {
   "name": "mobile",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "index",
   "dependencies": {
     "@expo-google-fonts/instrument-serif": "^0.4.1",
     "@expo-google-fonts/urbanist": "^0.4.2",

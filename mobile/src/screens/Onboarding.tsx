@@ -201,6 +201,8 @@ function CatchBeat({ hero, pebble, spark, onNext }: { hero: FreeShape; pebble: F
   const input = useRef<ComponentRef<typeof TextInput>>(null);
   const [text, setText] = useState('');
   const [caught, setCaught] = useState(false);
+  const advance = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(advance.current), []);
   const stone = { x: 18, w: W - 36, h: 176, cy: H * 0.43 };
 
   useEffect(() => {
@@ -238,7 +240,7 @@ function CatchBeat({ hero, pebble, spark, onNext }: { hero: FreeShape; pebble: F
     pebble.melt.value = withDelay(600, withTiming(0, { duration: 400 }));
     setTimeout(() => { ripple(W / 2, H * 0.74 + 10, 1); feel.land(1); }, 820);
     await catchThought(t);
-    setTimeout(onNext, 2600);
+    advance.current = setTimeout(onNext, 2600);
   }
 
   return (
@@ -264,6 +266,7 @@ function CatchBeat({ hero, pebble, spark, onNext }: { hero: FreeShape; pebble: F
             placeholder="call dentist thing…"
             placeholderTextColor={p.inkFaint}
             multiline
+            maxLength={2000}
             submitBehavior="submit"
             returnKeyType="send"
             onSubmitEditing={() => void save(text)}

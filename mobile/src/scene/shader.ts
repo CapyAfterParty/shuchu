@@ -13,7 +13,7 @@
 //    lands, and the warm sparks that pull the eye.
 // 4. Film grain and dithering, so gradients never band.
 
-export const SLOTS = 24;
+export const SLOTS = 32;
 export const SPARKS = 4;
 export const RIPPLES = 3;
 

@@ -3,7 +3,7 @@
 // you can feel at every step.
 
 import { BlurMask, Canvas, Circle, Group, Line, Path, Skia, Text, useFont, vec } from '@shopify/react-native-skia';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { type LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import { useAnimatedReaction, useDerivedValue, useSharedValue, withSpring } from 'react-native-reanimated';
@@ -34,9 +34,17 @@ export function Dial({ values, index, onChange, label, step = 44, subdivisions =
   const pos = useSharedValue(index);
   const start = useSharedValue(index);
   const n = values.length;
+  // the last value the dial itself reported; echoes of it must not interrupt a flick
+  const emitted = useRef(index);
+  const report = (i: number) => {
+    emitted.current = i;
+    onChange(i);
+  };
 
   useEffect(() => {
-    if (Math.round(pos.value) !== index) pos.value = withSpring(index, { damping: 20, stiffness: 160 });
+    if (index === emitted.current) return;
+    emitted.current = index;
+    pos.value = withSpring(index, { damping: 20, stiffness: 160 });
   }, [index]);
 
   useAnimatedReaction(
@@ -44,7 +52,7 @@ export function Dial({ values, index, onChange, label, step = 44, subdivisions =
     (now, before) => {
       if (before === null || now === before) return;
       scheduleOnRN(feel.tick);
-      scheduleOnRN(onChange, now);
+      scheduleOnRN(report, now);
     },
   );
 
