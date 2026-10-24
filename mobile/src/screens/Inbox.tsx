@@ -24,6 +24,8 @@ import { Icon } from '../ui/Icon';
 import { Reveal } from '../ui/motion';
 import { Txt } from '../ui/Txt';
 
+const SWIPE = 90; // points of finger travel that commit a swipe
+
 export const REASONS: { key: NotDoingReason; label: string; icon: 'hand' | 'leaf' | 'split' }[] = [
   { key: 'not_mine', label: 'Not mine', icon: 'hand' },
   { key: 'not_needed', label: 'Not needed', icon: 'leaf' },
@@ -153,6 +155,8 @@ function Row({ task, waiting, onPress, onClear, onLetGo }: {
   const x = useSharedValue(0);
   const fired = useSharedValue(0); // 1 = clear, -1 = let go
   const pressed = useSharedValue(0);
+  const travel = useSharedValue(0); // how far the finger moved, so a swipe is never also a tap
+  const raw = useSharedValue(0); // the finger's real travel; the row itself moves a little less
 
   useAnimatedReaction(
     () => fired.value,
@@ -165,7 +169,7 @@ function Row({ task, waiting, onPress, onClear, onLetGo }: {
   );
   const crossed = useSharedValue(0);
   useAnimatedReaction(
-    () => (x.value > 84 ? 1 : x.value < -84 ? -1 : 0),
+    () => (raw.value > SWIPE ? 1 : raw.value < -SWIPE ? -1 : 0),
     (v, prev) => {
       if (prev !== null && v !== prev && v !== 0) scheduleOnRN(feel.tick);
       crossed.value = v;
@@ -175,20 +179,30 @@ function Row({ task, waiting, onPress, onClear, onLetGo }: {
   const pan = usePanGesture({
     activeOffsetX: [-14, 14],
     failOffsetY: [-12, 12],
+    onBegin: () => {
+      'worklet';
+      travel.value = 0;
+      raw.value = 0;
+    },
     onUpdate: (e) => {
       'worklet';
       const t = e.translationX;
+      travel.value = Math.max(travel.value, Math.abs(t));
+      raw.value = t;
       x.value = Math.sign(t) * Math.pow(Math.abs(t), 0.88);
     },
-    onDeactivate: () => {
+    // onFinalize always runs, even when the gesture is cancelled, so a row
+    // can never be left stuck halfway
+    onFinalize: () => {
       'worklet';
-      if (x.value > 84) {
+      if (raw.value > SWIPE) {
         x.value = withTiming(420, { duration: 380 });
         fired.value = 1;
       } else {
-        if (x.value < -84) fired.value = -1;
+        if (raw.value < -SWIPE) fired.value = -1;
         x.value = withSpring(0, spring.jelly);
       }
+      raw.value = 0;
     },
   });
 
@@ -196,8 +210,9 @@ function Row({ task, waiting, onPress, onClear, onLetGo }: {
     transform: [{ translateX: x.value }, { scale: 1 - pressed.value * 0.015 }],
     opacity: interpolate(x.value, [0, 300, 420], [1, 0.6, 0], 'clamp'),
   }));
-  const clearHint = useAnimatedStyle(() => ({ opacity: interpolate(x.value, [10, 84], [0, 1], 'clamp'), transform: [{ scale: interpolate(x.value, [10, 84, 120], [0.6, 1, 1.15], 'clamp') }] }));
-  const goHint = useAnimatedStyle(() => ({ opacity: interpolate(x.value, [-10, -84], [0, 1], 'clamp'), transform: [{ scale: interpolate(x.value, [-10, -84, -120], [0.6, 1, 1.15], 'clamp') }] }));
+  // the hint icons swell as you near the point of no return
+  const clearHint = useAnimatedStyle(() => ({ opacity: interpolate(raw.value, [10, SWIPE], [0, 1], 'clamp'), transform: [{ scale: interpolate(raw.value, [10, SWIPE, SWIPE + 40], [0.6, 1, 1.15], 'clamp') }] }));
+  const goHint = useAnimatedStyle(() => ({ opacity: interpolate(raw.value, [-10, -SWIPE], [0, 1], 'clamp'), transform: [{ scale: interpolate(raw.value, [-10, -SWIPE, -SWIPE - 40], [0.6, 1, 1.15], 'clamp') }] }));
 
   const sub = task.place === 'errand' ? 'out and about' : task.firstStep ? `first: ${lower(task.firstStep)}` : '';
 
@@ -209,8 +224,8 @@ function Row({ task, waiting, onPress, onClear, onLetGo }: {
         <Animated.View style={[styles.row, slide]}>
           <Pressable
             style={styles.rowText}
-            onPress={onPress}
-            onPressIn={() => { pressed.value = withTiming(1, { duration: 120 }); }}
+            onPress={() => { if (travel.value < 8) onPress(); }}
+            onPressIn={() => { travel.value = 0; pressed.value = withTiming(1, { duration: 120 }); }}
             onPressOut={() => { pressed.value = withSpring(0, spring.jelly); }}
             accessibilityRole="button"
             accessibilityHint="Opens the details"
@@ -288,7 +303,7 @@ const styles = StyleSheet.create({
   section: { marginTop: 26 },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 },
   rowWrap: { position: 'relative' },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15, gap: 14 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15, gap: 14, userSelect: 'none' },
   rowText: { flex: 1, minWidth: 0 },
   meta: { alignItems: 'flex-end', gap: 5 },
   metaIcons: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -297,7 +312,7 @@ const styles = StyleSheet.create({
   hintLeft: { position: 'absolute', left: 0, top: 0, bottom: 0, justifyContent: 'center' },
   hintRight: { position: 'absolute', right: 0, top: 0, bottom: 0, justifyContent: 'center' },
   reasons: { paddingTop: 6, paddingBottom: 18 },
-  reasonRow: { flexDirection: 'row', gap: 10 },
+  reasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   reason: { height: 42, paddingHorizontal: 14 },
   reasonInner: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   stillButtons: { flexDirection: 'row', gap: 8 },

@@ -33,6 +33,14 @@ const PLACEHOLDERS = [
   'fix the invoice thing…',
 ];
 
+/** The stone's whisper follows the day. */
+function promptFor(hour: number): string {
+  if (hour >= 5 && hour < 11) return "what's on your mind this morning?";
+  if (hour >= 17 && hour < 22) return 'anything still in your head?';
+  if (hour >= 22 || hour < 5) return 'put it down, then rest';
+  return 'catch a thought';
+}
+
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -149,7 +157,7 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
             presence={presence}
             frame={stone}
           >
-            <Txt variant="whisper" tone="soft" style={styles.label}>catch a thought</Txt>
+            <Txt variant="whisper" tone="soft" style={styles.label}>{promptFor(now.getHours())}</Txt>
             <TextInput
               ref={input}
               value={text}

@@ -4,12 +4,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, {
   measure,
   type SharedValue,
   useAnimatedRef,
   useFrameCallback,
   useSharedValue,
+  useAnimatedReaction,
   useAnimatedStyle,
   withDelay,
   withSpring,
@@ -81,10 +83,40 @@ export function Basin({ tasks, origin, arriving, onPress, presence, height = 96 
     ? 'nothing waiting · your head is clear'
     : [desk && `${desk} at your desk`, errands && `${errands} out and about`].filter(Boolean).join(' · ');
 
-  const wordsStyle = useAnimatedStyle(() => ({ opacity: Math.max(0, (presence.value - 0.4) / 0.6) }));
+  // swipe up to open: the pebbles lift under your finger
+  const drag = useSharedValue(0);
+  const opened = useSharedValue(0);
+  const pan = usePanGesture({
+    activeOffsetY: [-10, 10],
+    failOffsetX: [-24, 24],
+    onUpdate: (e) => {
+      'worklet';
+      drag.value = Math.min(0, e.translationY) * 0.45;
+    },
+    onDeactivate: (e) => {
+      'worklet';
+      if (e.translationY < -50 || e.velocityY < -600) opened.value += 1;
+    },
+    onFinalize: () => {
+      'worklet';
+      drag.value = withSpring(0, spring.jelly);
+    },
+  });
+  useAnimatedReaction(
+    () => opened.value,
+    (now, before) => {
+      if (before !== null && now > before) scheduleOnRN(onPress);
+    },
+  );
+
+  const wordsStyle = useAnimatedStyle(() => ({
+    opacity: Math.max(0, (presence.value - 0.4) / 0.6),
+    transform: [{ translateY: drag.value * 0.5 }],
+  }));
 
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`Open inbox. ${words}`} style={{ height }}>
+    <GestureDetector gesture={pan}>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`Open inbox. ${words}`} accessibilityHint="Swipe up or tap" style={{ height }}>
       <View ref={ref} collapsable={false} style={styles.row}>
         {layout.map((l, i) => (
           <Pebble
@@ -97,6 +129,7 @@ export function Basin({ tasks, origin, arriving, onPress, presence, height = 96 
             fresh={l.id === arriving || Date.now() - Date.parse(shown[i].createdAt) < 1500}
             order={i}
             presence={presence}
+            drag={drag}
           />
         ))}
       </View>
@@ -104,11 +137,12 @@ export function Basin({ tasks, origin, arriving, onPress, presence, height = 96 
         <Txt variant="whisper" tone="soft" align="center">{words}</Txt>
       </Animated.View>
     </Pressable>
+    </GestureDetector>
   );
 }
 
 function Pebble({
-  task, target, rowWidth, box, origin, fresh, order, presence,
+  task, target, rowWidth, box, origin, fresh, order, presence, drag,
 }: {
   task: Task;
   target: { x: number; w: number; h: number };
@@ -118,6 +152,7 @@ function Pebble({
   fresh: boolean;
   order: number;
   presence: SharedValue<number>;
+  drag: SharedValue<number>;
 }) {
   const [slot] = useState(claimSlot);
   const [seed] = useState(() => Math.random());
@@ -181,7 +216,7 @@ function Pebble({
     const k = presence.value;
     writeShape(slot, {
       cx: b.x + b.w / 2 + px,
-      cy: b.y + b.h / 2 - 12 + py,
+      cy: b.y + b.h / 2 - 12 + py + drag.value * (1 + (order % 3) * 0.15),
       hw: target.w / 2,
       hh: target.h / 2,
       radius: Math.min(target.w, target.h) / 2,

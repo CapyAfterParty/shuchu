@@ -127,7 +127,7 @@ function Arrive({ hero, spark, onNext }: { hero: FreeShape; spark: Spark; onNext
     hero.radius.value = size;
     hero.presence.value = Math.min(1, h * 2.2);
     hero.warm.value = 0.5 * h;
-    spark.boost.value = h * 1.6;
+    spark.boost.value = h * 0.9;
     spark.r.value = 6 + h * 4;
   });
 

@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 12, marginTop: 34 },
   primary: { flex: 1, height: 54 },
   secondary: { flex: 1, height: 54 },
-  reasonRow: { flexDirection: 'row', gap: 10 },
+  reasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   reason: { height: 42, paddingHorizontal: 14 },
   reasonInner: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 });

@@ -2,6 +2,8 @@
 
 Catch tasks on your phone; find them waiting at your desk.
 
+**The phone app lives in [`mobile/`](mobile/README.md).** Start there to run it on your iPhone.
+
 - `shared/task.ts`: the one task model, used by phone, desk and server.
 - `server/`: one server holds the truth (`data/tasks.json`) and pushes every change over Server-Sent Events.
 - `clients/`: logic (`sync.ts`, `phone/phone.ts`, `phone/outbox.ts`, `desktop/desk.ts`) kept apart from

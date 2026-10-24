@@ -24,6 +24,7 @@ uniform float density;
 uniform float2 light;      // unit direction towards the light, screen space
 uniform float2 tilt;       // parallax, -1..1
 uniform float haze;        // 0..1 deepens the depth of field behind sheets
+uniform float quality;     // 1 = full, 0 = lighter path for slower phones
 
 uniform float3 air;
 uniform float3 b0; uniform float3 b1; uniform float3 b2;
@@ -223,9 +224,14 @@ float3 baseLayer(float2 p) {
     float2 off = -n * bend * 34.0;
     float frost = 15.0;
     float3 g;
-    g.r = atmosphere(rippled(p + off * 1.00), frost).r;
-    g.g = atmosphere(rippled(p + off * 1.08), frost).g;
-    g.b = atmosphere(rippled(p + off * 1.17), frost).b;
+    if (quality > 0.5) {
+      // red, green and blue bend by slightly different amounts
+      g.r = atmosphere(rippled(p + off * 1.00), frost).r;
+      g.g = atmosphere(rippled(p + off * 1.08), frost).g;
+      g.b = atmosphere(rippled(p + off * 1.17), frost).b;
+    } else {
+      g = atmosphere(p + off * 1.06, frost);
+    }
     g = mix(g, milk, clamp(glassStrength * (0.75 + 0.7 * edge) + s.y * 0.72, 0.0, 0.92));
     g = lightGlass(g, n, d, edge, bend, s.y, s.z);
     col = mix(col, g, smoothstep(1.5, -0.8, d));
@@ -253,7 +259,7 @@ half4 main(float2 p) {
       float2 n = normalAt(p, d, 1.0);
       float edge = 1.0 - clamp(-d / 18.0, 0.0, 1.0);
       float bend = edge * edge * (0.6 + 0.4 * edge);
-      float3 g = baseLayer(p - n * bend * 14.0);
+      float3 g = quality > 0.5 ? baseLayer(p - n * bend * 14.0) : col;
       g = mix(g, milk, clamp(0.12 + glassStrength * 0.5 * edge + s.y * 0.72, 0.0, 0.92));
       g = lightGlass(g, n, d, edge, bend, s.y, s.z);
       col = mix(col, g, smoothstep(1.5, -0.8, d));

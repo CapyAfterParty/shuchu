@@ -48,11 +48,19 @@ export function Dial({ values, index, onChange, label, step = 44, subdivisions =
     },
   );
 
+  const settled = useSharedValue(true);
   const pan = usePanGesture({
     minDistance: 2,
     onBegin: () => {
       'worklet';
+      settled.value = false;
       start.value = pos.value;
+    },
+    // a cancelled drag still lands on a value
+    onFinalize: () => {
+      'worklet';
+      if (!settled.value) pos.value = withSpring(Math.round(Math.max(0, Math.min(n - 1, pos.value))), { damping: 18, stiffness: 140 });
+      settled.value = true;
     },
     onUpdate: (e) => {
       'worklet';
@@ -62,6 +70,7 @@ export function Dial({ values, index, onChange, label, step = 44, subdivisions =
     },
     onDeactivate: (e) => {
       'worklet';
+      settled.value = true;
       const target = Math.round(Math.max(0, Math.min(n - 1, pos.value - (e.velocityX / step) * 0.16)));
       pos.value = withSpring(target, { damping: 18, stiffness: 140, mass: 1, velocity: -e.velocityX / step });
     },

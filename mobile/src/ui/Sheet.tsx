@@ -65,16 +65,28 @@ export function Sheet({ open, onClose, children, recede = false }: Props) {
     },
   );
 
+  const settled = useSharedValue(true);
   const pan = usePanGesture({
     activeOffsetY: [-12, 12],
+    onBegin: () => {
+      'worklet';
+      settled.value = false;
+    },
     onUpdate: (e) => {
       'worklet';
       const t = e.translationY;
       // free downwards, stiff upwards (rubber band)
       dy.value = t > 0 ? t : -Math.sqrt(-t) * 4;
     },
+    // a cancelled drag still floats back home
+    onFinalize: () => {
+      'worklet';
+      if (!settled.value) dy.value = withSpring(0, spring.jelly);
+      settled.value = true;
+    },
     onDeactivate: (e) => {
       'worklet';
+      settled.value = true;
       if (e.translationY > height * 0.18 || e.velocityY > 900) {
         dy.value = withSpring(height * 0.4, spring.sheet);
         dismiss.value = 1;

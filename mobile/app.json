@@ -36,7 +36,22 @@
       "expo-audio",
       [
         "expo-notifications",
-        { "color": "#DCE5EE" }
+        {
+          "color": "#DCE5EE"
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#D9E2EB",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#0C1219",
+            "image": "./assets/splash-icon.png"
+          }
+        }
       ]
     ]
   }

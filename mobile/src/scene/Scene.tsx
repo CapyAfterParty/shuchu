@@ -35,8 +35,20 @@ export function Scene() {
   const drift = useSharedValue(0);
   const lastClock = useSharedValue(0);
   const speed = useSharedValue(1);
+  // Adaptive quality: watch our own frame times and lighten the shader on a
+  // phone that can't keep up, then restore it once there is headroom.
+  const frameAvg = useSharedValue(16);
+  const quality = useSharedValue(1);
+  const qualityHold = useSharedValue(0);
 
-  useFrameCallback(() => {
+  useFrameCallback((info) => {
+    const ft = info.timeSincePreviousFrame ?? 16;
+    if (ft > 0 && ft < 250) frameAvg.value += (ft - frameAvg.value) * 0.05;
+    qualityHold.value += 1;
+    if (qualityHold.value > 90) {
+      if (quality.value === 1 && frameAvg.value > 24) { quality.value = 0; qualityHold.value = 0; }
+      else if (quality.value === 0 && frameAvg.value < 13) { quality.value = 1; qualityHold.value = 0; }
+    }
     sceneClock.value = clock.value;
     const dt = lastClock.value ? Math.min(clock.value - lastClock.value, 100) : 0;
     lastClock.value = clock.value;
@@ -96,6 +108,7 @@ export function Scene() {
       light: [lx, ly],
       tilt: [t.x, t.y],
       haze: haze.value,
+      quality: quality.value,
       air: mixc(mist.air, night.air),
       b0: mixc(mist.blobs[0], night.blobs[0]),
       b1: mixc(mist.blobs[1], night.blobs[1]),
