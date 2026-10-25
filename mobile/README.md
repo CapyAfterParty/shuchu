@@ -2,13 +2,13 @@
 
 Catch a thought in under three seconds. It waits at your desk.
 
-## See it on your phone (Android or iPhone)
+## Try it on your phone today (Expo Go, 5 minutes)
 
 You need [Node.js](https://nodejs.org) 22+ on your computer and **Expo Go** on the phone
 ([Google Play](https://play.google.com/store/apps/details?id=host.exp.exponent) or the App Store). Both on the same Wi-Fi.
 
 ```sh
-# 1. the desk server (from the repo root)
+# 1. the desk server (from the repo root) — optional, the app works without it
 npm install
 npm start
 
@@ -22,7 +22,60 @@ Android: open Expo Go and tap "Scan QR code". iPhone: scan it with the camera. I
 
 Without a server the app still works: every thought is kept on the phone and sent once a desk is linked.
 
-Web preview (same code, in a browser): `npm run export:web`, then serve `dist/`.
+Expo Go is the real app running natively (real GPU glass, haptics, tilt), not the web preview.
+It only runs while `npx expo start` is running on your computer; for an app that stays on the phone, see below.
+
+## A real install on your phone (EAS Build)
+
+This makes the actual app, with its own icon, that stays on your phone without your computer running.
+Builds run in Expo's cloud, so you don't need Android Studio or a Mac. Free account at [expo.dev](https://expo.dev).
+
+```sh
+cd mobile
+npm install -g eas-cli
+eas login
+eas init                                # links the project to your Expo account (one time)
+
+eas build --platform android --profile preview
+```
+
+When it finishes (about 10–15 minutes) you get a link and a QR code. Open it on your Android phone,
+download the `.apk` and install it (Android will ask you to allow installs from your browser once).
+
+iPhone: `eas build --platform ios --profile preview` installs straight to registered iPhones. It needs a paid
+Apple Developer account ($99/year); EAS walks you through registering your phone (`eas device:create`).
+Or go through TestFlight, below.
+
+## Putting it in the stores
+
+Before the first store build, pick the app's permanent ID. It's set to `app.shuchu` in `app.json`
+(`ios.bundleIdentifier` and `android.package`); change both to something you own, such as
+`com.yourname.shuchu`. It can't be changed after the first upload.
+
+```sh
+eas build --platform all --profile production   # .aab for Google Play, .ipa for the App Store
+eas submit --platform android                   # uploads to Play's internal testing track
+eas submit --platform ios                       # uploads to App Store Connect / TestFlight
+```
+
+- **Google Play** — a [Play Console](https://play.google.com/console) account ($25 once). Create the app
+  in the console first, and upload the very first `.aab` by hand (Play requires that); after that `eas submit`
+  works. Send it to internal testing, then production.
+- **App Store** — an [Apple Developer](https://developer.apple.com/programs/) account ($99/year).
+  `eas submit` creates the App Store Connect entry and uploads; the build appears in TestFlight for you to try,
+  then you submit it for review from App Store Connect.
+- Version numbers: set `version` in `app.json` for each release; build numbers count up by themselves.
+
+Both stores will ask for screenshots, a short description, a privacy policy URL and a privacy questionnaire.
+For the questionnaire: Shuchu collects nothing. Thoughts stay on the phone and go only to the desk server
+you run yourself; there are no accounts, analytics or ads.
+
+What's already set up for review: the only permissions are vibration, notifications (the evening question),
+motion (the light follows tilt) and local network (finding your desk). No microphone, no background audio,
+no location, and the encryption export question is answered.
+
+One limit to know: the phone talks to the desk server over plain `http` on your Wi-Fi, which both stores
+allow for local networks. Linking a desk from outside your home network needs the server behind `https`.
 
 ## What's where
 
@@ -32,7 +85,7 @@ src/
   scene/        the glass engine
     shader.ts     one SkSL shader: atmosphere, glass, shadows, sparks, ripples
     Scene.tsx     the canvas behind everything; tilt light, adaptive quality
-    world.ts      shared UI-thread state: 24 glass slots, sparks, ripples
+    world.ts      shared UI-thread state: 32 glass slots, sparks, ripples
     Glass.tsx     makes any view glass: claims a slot, tracks itself every frame
     useShape.ts   free glass shapes for morphing heroes and pebbles
   screens/      Onboarding, Capture, Basin, Inbox, Detail, Settings

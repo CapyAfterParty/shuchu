@@ -40,3 +40,7 @@ yarn-error.*
 /ios
 /android
 public/canvaskit.wasm
+
+# Native projects are generated from app.json (npx expo prebuild / EAS Build)
+/android
+/ios
