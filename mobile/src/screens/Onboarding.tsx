@@ -4,7 +4,6 @@
 import { type ComponentRef, useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
 import Animated, {
-  cancelAnimation,
   Easing,
   type SharedValue,
   useAnimatedReaction,
@@ -159,19 +158,15 @@ function Arrive({ hero, spark, onNext }: { hero: FreeShape; spark: Spark; onNext
   return (
     <Pressable
       style={StyleSheet.absoluteFill}
+      // Touching the light is enough: the glass fills and blooms on its own,
+      // so a tap, a hold, or a touch the browser interrupts all work.
       onPressIn={() => {
-        if (stage < 3) return;
+        if (hold.value > 0) return;
         feel.touch();
-        hold.value = withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.quad) });
-      }}
-      onPressOut={() => {
-        if (hold.value < 0.999) {
-          cancelAnimation(hold);
-          hold.value = withSpring(0, spring.settle);
-        }
+        hold.value = withTiming(1, { duration: 1400, easing: Easing.inOut(Easing.quad) });
       }}
       accessibilityRole="button"
-      accessibilityLabel="Press and hold to begin"
+      accessibilityLabel="Touch the light to begin"
       accessibilityActions={[{ name: 'activate' }]}
       onAccessibilityAction={() => { hold.value = withTiming(1, { duration: 600 }); }}
     >
@@ -186,7 +181,7 @@ function Arrive({ hero, spark, onNext }: { hero: FreeShape; spark: Spark; onNext
       <Animated.View pointerEvents="none" style={[styles.ring, { left: W / 2 - 70, top: H * 0.5 - 70, borderColor: p.inkSoft }, ring]} />
       <View style={[styles.holdHint, { top: H * 0.5 + 96 }]} pointerEvents="none">
         <Reveal show={stage >= 3} duration={1200}>
-          <Txt variant="whisper" tone="soft" align="center">press and hold the light</Txt>
+          <Txt variant="whisper" tone="soft" align="center">touch the light</Txt>
         </Reveal>
       </View>
     </Pressable>
