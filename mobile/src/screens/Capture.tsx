@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { catchThought, isOpen, useTasks } from '../data/tasks';
 import { feel } from '../feel/feel';
 import { Glass, type Frame } from '../scene/Glass';
-import { useTheme } from '../theme/theme';
+import { useTheme, useTypeScale } from '../theme/theme';
 import { font, spring, type as T } from '../theme/tokens';
 import { GlassButton } from '../ui/GlassButton';
 import { Icon } from '../ui/Icon';
@@ -54,6 +54,7 @@ interface Props {
 
 export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props) {
   const p = useTheme();
+  const k = useTypeScale();
   const insets = useSafeAreaInsets();
   // Android draws edge to edge, so both system bars are translucent
   const keyboard = useAnimatedKeyboard({ isStatusBarTranslucentAndroid: true, isNavigationBarTranslucentAndroid: true });
@@ -186,7 +187,7 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
               selectionColor={p.inkSoft}
               cursorColor={p.inkSoft}
               keyboardAppearance={p.name === 'night' ? 'dark' : 'light'}
-              style={[styles.input, { color: p.ink }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
+              style={[styles.input, { color: p.ink, fontSize: T.thought.fontSize * k, lineHeight: T.thought.lineHeight * k, minHeight: 80 * k }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
               accessibilityLabel="Catch a thought"
             />
             {ghost && <Ghost key={ghost.key} text={ghost.text} onDone={() => setGhost(null)} />}
@@ -231,8 +232,9 @@ function Ghost({ text, onDone }: { text: string; onDone: () => void }) {
     letterSpacing: -0.5 + t.value * 3,
   }));
   const p = useTheme();
+  const k = useTypeScale();
   return (
-    <Animated.Text numberOfLines={3} style={[styles.input, styles.ghost, { color: p.ink }, a]} pointerEvents="none">
+    <Animated.Text numberOfLines={3} style={[styles.input, styles.ghost, { color: p.ink, fontSize: T.thought.fontSize * k, lineHeight: T.thought.lineHeight * k }, a]} pointerEvents="none">
       {text}
     </Animated.Text>
   );

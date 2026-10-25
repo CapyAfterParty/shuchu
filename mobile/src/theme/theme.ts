@@ -1,7 +1,7 @@
 // Which atmosphere is active, and a smooth crossfade between them.
 
 import { useEffect } from 'react';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, useWindowDimensions } from 'react-native';
 import { withTiming, Easing } from 'react-native-reanimated';
 import { useSettings } from '../data/settings';
 import { themeBlend } from '../scene/world';
@@ -22,4 +22,13 @@ export function useThemeBlend(palette: Palette): void {
       easing: Easing.inOut(Easing.cubic),
     });
   }, [palette.name]);
+}
+
+/**
+ * How much large type shrinks on this screen: 1 on a roomy phone, down to
+ * 0.7 on small or short ones (and in embedded web views).
+ */
+export function useTypeScale(): number {
+  const { width, height } = useWindowDimensions();
+  return Math.max(0.7, Math.min(1, width / 390, height / 780));
 }

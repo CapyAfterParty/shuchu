@@ -1,12 +1,18 @@
 // The welcome. One shape of glass travels through every beat: a drop held in
 // your hand, the stone you speak into, the desk it waits at, the evening moon.
+//
+// Layout is ordinary flowing columns, so it fits any screen. The glass and the
+// light don't have fixed positions: each beat marks a placeholder, and every
+// frame the glass springs towards wherever that placeholder actually is.
 
-import { type ComponentRef, useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
+import { type ComponentRef, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
+  measure,
   type SharedValue,
   useAnimatedReaction,
+  useAnimatedRef,
   useAnimatedStyle,
   useFrameCallback,
   useSharedValue,
@@ -22,9 +28,10 @@ import { guessedServerUrl, updateSettings, useSettings } from '../data/settings'
 import { catchThought, ping } from '../data/tasks';
 import { askPermission, formatClock } from '../feel/evening';
 import { feel } from '../feel/feel';
+import type { Frame } from '../scene/Glass';
 import { type FreeShape, useShape } from '../scene/useShape';
 import { claimSpark, releaseSpark, ripple, writeSpark } from '../scene/world';
-import { useTheme } from '../theme/theme';
+import { useTheme, useTypeScale } from '../theme/theme';
 import { font, spring, type as T } from '../theme/tokens';
 import { Dial } from '../ui/Dial';
 import { GlassButton } from '../ui/GlassButton';
@@ -35,103 +42,180 @@ import { EVENING } from './Settings';
 type Beat = 'arrive' | 'catch' | 'desk' | 'evening' | 'clear';
 const ORDER: Beat[] = ['arrive', 'catch', 'desk', 'evening', 'clear'];
 
+/** Where the hero glass and the light should be. Beats write it; the stage follows. */
+interface Stage {
+  target: SharedValue<Frame>;
+  radius: SharedValue<number>;
+  /** The light's place inside the target, 0..1 on each axis. */
+  anchor: SharedValue<{ x: number; y: number }>;
+  hero: FreeShape;
+  pebble: FreeShape;
+  spark: { i: SharedValue<number>; r: SharedValue<number>; boost: SharedValue<number>; x: SharedValue<number>; y: SharedValue<number> };
+}
+
 export function Onboarding({ onDone }: { onDone: () => void }) {
   const { width: W, height: H } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
   const [beat, setBeat] = useState<Beat>('arrive');
-  const hero = useShape({ cx: W / 2, cy: H * 0.46, hw: 2, hh: 2, radius: 2, presence: 0, melt: 30, lift: 0.7 }, 2.4);
-  const pebble = useShape({ cx: W / 2, cy: H * 0.5, hw: 22, hh: 20, radius: 20, presence: 0, melt: 38, lift: 0.4, pearl: 0.3 }, 1.5);
+  const hero = useShape({ cx: W / 2, cy: H * 0.5, hw: 2, hh: 2, radius: 2, presence: 0, melt: 30, lift: 0.7 }, 2.4);
+  const pebble = useShape({ cx: W / 2, cy: H * 0.5, hw: 20, hh: 18, radius: 18, presence: 0, melt: 38, lift: 0.4, pearl: 0.3 }, 1.5);
 
-  // the one spark of the welcome
+  const target = useSharedValue<Frame>({ x: W / 2, y: H / 2, w: 0, h: 0 });
+  const radius = useSharedValue(2);
+  const anchor = useSharedValue({ x: 0.5, y: 0.5 });
   const sparkX = useSharedValue(W / 2);
-  const sparkY = useSharedValue(H * 0.46);
+  const sparkY = useSharedValue(H / 2);
   const sparkI = useSharedValue(0);
   const sparkR = useSharedValue(6);
   const sparkBoost = useSharedValue(0);
   const breath = useSharedValue(1);
+  const vel = useSharedValue({ cx: 0, cy: 0, hw: 0, hh: 0, r: 0, sx: 0, sy: 0 });
   const [sparkSlot] = useState(claimSpark);
   useEffect(() => () => releaseSpark(sparkSlot), [sparkSlot]);
-  useFrameCallback(() => {
+
+  // A soft spring per frame: the glass flows to its target and overshoots a
+  // touch, like something liquid settling. The light rides along inside it.
+  useFrameCallback((info) => {
+    const dt = Math.min((info.timeSincePreviousFrame ?? 16) / 1000, 0.05);
+    const t = target.value;
+    const round = Math.min(t.w, t.h) / 2;
+    const goal = { cx: t.x + t.w / 2, cy: t.y + t.h / 2, hw: t.w / 2, hh: t.h / 2, r: radius.value < 0 ? round : Math.min(radius.value, round) };
+    const v = { ...vel.value };
+    const step = (x: number, g: number, key: 'cx' | 'cy' | 'hw' | 'hh' | 'r') => {
+      v[key] = (v[key] + (g - x) * 170 * dt) * Math.exp(-15 * dt);
+      return x + v[key] * dt;
+    };
+    hero.cx.value = step(hero.cx.value, goal.cx, 'cx');
+    hero.cy.value = step(hero.cy.value, goal.cy, 'cy');
+    hero.hw.value = step(hero.hw.value, goal.hw, 'hw');
+    hero.hh.value = step(hero.hh.value, goal.hh, 'hh');
+    hero.radius.value = Math.max(0, step(hero.radius.value, goal.r, 'r'));
+    vel.value = v;
+    const a = anchor.value;
+    const k = 1 - Math.exp(-9 * dt);
+    sparkX.value += (t.x + t.w * a.x - sparkX.value) * k;
+    sparkY.value += (t.y + t.h * a.y - sparkY.value) * k;
     writeSpark(sparkSlot, sparkX.value, sparkY.value, sparkI.value * breath.value + sparkBoost.value, sparkR.value);
   });
+
   useEffect(() => {
     breath.value = withRepeat(withSequence(withTiming(1.12, { duration: 2400 }), withTiming(0.9, { duration: 2400 })), -1, true);
   }, []);
 
+  const stage: Stage = {
+    target, radius, anchor, hero, pebble,
+    spark: { i: sparkI, r: sparkR, boost: sparkBoost, x: sparkX, y: sparkY },
+  };
   const go = useCallback((b: Beat) => setBeat(b), []);
   const step = ORDER.indexOf(beat);
 
   return (
-    <View style={[StyleSheet.absoluteFill, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      {beat === 'arrive' && <Arrive hero={hero} spark={{ x: sparkX, y: sparkY, i: sparkI, r: sparkR, boost: sparkBoost }} onNext={() => go('catch')} />}
-      {beat === 'catch' && <CatchBeat hero={hero} pebble={pebble} spark={{ x: sparkX, y: sparkY, i: sparkI, r: sparkR, boost: sparkBoost }} onNext={() => go('desk')} />}
-      {beat === 'desk' && <DeskBeat hero={hero} pebble={pebble} spark={{ x: sparkX, y: sparkY, i: sparkI, r: sparkR, boost: sparkBoost }} onNext={() => go('evening')} />}
-      {beat === 'evening' && <EveningBeat hero={hero} spark={{ x: sparkX, y: sparkY, i: sparkI, r: sparkR, boost: sparkBoost }} onNext={() => go('clear')} />}
-      {beat === 'clear' && <ClearBeat hero={hero} spark={{ x: sparkX, y: sparkY, i: sparkI, r: sparkR, boost: sparkBoost }} onDone={onDone} />}
-
-      {step > 0 && step < 4 && (
-        <View style={[styles.top, { top: insets.top + 14 }]} pointerEvents="box-none">
-          <Dots step={step} />
-          <Txt variant="whisper" tone="faint" onPress={() => go('clear')} style={styles.skip} accessibilityRole="button">skip</Txt>
-        </View>
-      )}
+    <View style={StyleSheet.absoluteFill}>
+      {beat === 'arrive' && <Arrive stage={stage} onNext={() => go('catch')} />}
+      {beat === 'catch' && <CatchBeat stage={stage} onNext={() => go('desk')} />}
+      {beat === 'desk' && <DeskBeat stage={stage} onNext={() => go('evening')} />}
+      {beat === 'evening' && <EveningBeat stage={stage} onNext={() => go('clear')} />}
+      {beat === 'clear' && <ClearBeat stage={stage} onDone={onDone} />}
+      {step > 0 && step < 4 && <TopBar step={step} onSkip={() => go('clear')} />}
     </View>
   );
 }
 
-interface Spark { x: SharedValue<number>; y: SharedValue<number>; i: SharedValue<number>; r: SharedValue<number>; boost: SharedValue<number> }
+/* ---------- layout helpers ---------- */
 
-function Dots({ step }: { step: number }) {
-  const p = useTheme();
+/** A column that centres its content and scrolls if a screen is too short. */
+function Column({ children, gap, scroll = true }: { children: ReactNode; gap: number; scroll?: boolean }) {
+  const insets = useSafeAreaInsets();
+  if (!scroll) {
+    return (
+      <View style={[StyleSheet.absoluteFill, styles.column, { gap, paddingTop: insets.top + 48, paddingBottom: insets.bottom + 24 }]} pointerEvents="box-none">
+        {children}
+      </View>
+    );
+  }
   return (
-    <View style={styles.dots} accessibilityLabel={`Step ${step} of 3`}>
-      {[1, 2, 3].map((i) => (
-        <View key={i} style={[styles.dotStep, { backgroundColor: i <= step ? p.inkSoft : p.inkFaint, width: i === step ? 16 : 5 }]} />
-      ))}
+    <ScrollView
+      style={StyleSheet.absoluteFill}
+      contentContainerStyle={[styles.column, { gap, paddingTop: insets.top + 48, paddingBottom: insets.bottom + 24 }]}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      bounces={false}
+    >
+      {children}
+    </ScrollView>
+  );
+}
+
+/** Marks where the hero glass should be; the stage follows it every frame. */
+function useMark(stage: Stage, shape?: (m: Frame) => Frame) {
+  const ref = useAnimatedRef<View>();
+  useFrameCallback(() => {
+    const m = measure(ref);
+    if (!m || !m.width) return;
+    const f = { x: m.pageX, y: m.pageY, w: m.width, h: m.height };
+    stage.target.value = shape ? shape(f) : f;
+  });
+  return ref;
+}
+
+function TopBar({ step, onSkip }: { step: number; onSkip: () => void }) {
+  const p = useTheme();
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[styles.top, { top: insets.top + 14 }]} pointerEvents="box-none">
+      <View style={styles.dots} accessibilityLabel={`Step ${step} of 3`}>
+        {[1, 2, 3].map((i) => (
+          <View key={i} style={[styles.dotStep, { backgroundColor: i <= step ? p.inkSoft : p.inkFaint, width: i === step ? 16 : 5 }]} />
+        ))}
+      </View>
+      <Pressable onPress={onSkip} hitSlop={14} style={styles.skip} accessibilityRole="button" accessibilityLabel="Skip the welcome">
+        <Txt variant="whisper" tone="faint">skip</Txt>
+      </Pressable>
     </View>
   );
 }
 
-/* ---------- 1. arrival: hold the light ---------- */
+/* ---------- 1. arrival: touch the light ---------- */
 
-function Arrive({ hero, spark, onNext }: { hero: FreeShape; spark: Spark; onNext: () => void }) {
-  const { width: W, height: H } = useWindowDimensions();
+function Arrive({ stage, onNext }: { stage: Stage; onNext: () => void }) {
+  const k = useTypeScale();
+  const p = useTheme();
   const hold = useSharedValue(0);
-  const [stage, setStage] = useState(0);
   const done = useSharedValue(0);
+  const [phase, setPhase] = useState(0);
+  const LIGHT = 150 * k;
 
-  useEffect(() => {
-    spark.x.value = W / 2;
-    spark.y.value = H * 0.5;
-    spark.r.value = 6;
-    spark.i.value = withDelay(500, withTiming(1, { duration: 2200, easing: melt }));
-    const timers = [
-      setTimeout(() => feel.heartbeat(), 1700),
-      setTimeout(() => setStage(1), 900),
-      setTimeout(() => setStage(2), 2300),
-      setTimeout(() => setStage(3), 3600),
-    ];
-    return () => timers.forEach(clearTimeout);
-  }, []);
-
-  // the drop grows around the light as you hold
-  useFrameCallback(() => {
-    if (done.value === 1) return; // the next beat owns the glass now
-    const h = hold.value;
-    const size = 6 + h * 66;
-    hero.cx.value = W / 2;
-    hero.cy.value = H * 0.5;
-    hero.hw.value = size;
-    hero.hh.value = size * 0.94;
-    hero.radius.value = size;
-    hero.presence.value = Math.min(1, h * 2.2);
-    hero.warm.value = 0.5 * h;
-    spark.boost.value = h * 0.9;
-    spark.r.value = 6 + h * 4;
+  // the drop grows around the light as it fills
+  const mark = useMark(stage, (m) => {
+    'worklet';
+    const s = 6 + hold.value * 62 * (m.w / 150);
+    return { x: m.x + m.w / 2 - s, y: m.y + m.h / 2 - s * 0.94, w: s * 2, h: s * 1.88 };
   });
 
-  // when the beat ends, the extra light settles back
-  useEffect(() => () => { spark.boost.value = withTiming(0, { duration: 900 }); }, []);
+  useEffect(() => {
+    stage.anchor.value = { x: 0.5, y: 0.5 };
+    stage.radius.value = -1;
+    stage.spark.r.value = 6;
+    stage.spark.i.value = withDelay(500, withTiming(1, { duration: 2200, easing: melt }));
+    const timers = [
+      setTimeout(() => setPhase(1), 700),
+      setTimeout(() => feel.heartbeat(), 1600),
+      setTimeout(() => setPhase(2), 1900),
+      setTimeout(() => setPhase(3), 2900),
+    ];
+    return () => {
+      timers.forEach(clearTimeout);
+      stage.spark.boost.value = withTiming(0, { duration: 900 });
+    };
+  }, []);
+
+  useFrameCallback(() => {
+    if (done.value === 1) return;
+    const h = hold.value;
+    stage.hero.presence.value = Math.min(1, h * 2.2);
+    stage.hero.warm.value = 0.5 * h;
+    stage.spark.boost.value = h * 0.9;
+    stage.spark.r.value = 6 + h * 4;
+  });
 
   useAnimatedReaction(
     () => Math.floor(hold.value * 5),
@@ -144,76 +228,95 @@ function Arrive({ hero, spark, onNext }: { hero: FreeShape; spark: Spark; onNext
     },
   );
 
-  // a breathing ring invites the press, then dissolves as you hold
+  // a breathing ring invites the touch, then dissolves as the glass fills
   const pulse = useSharedValue(0);
   useEffect(() => {
-    if (stage >= 3) pulse.value = withRepeat(withTiming(1, { duration: 2600, easing: melt }), -1, false);
-  }, [stage]);
+    if (phase >= 3) pulse.value = withRepeat(withTiming(1, { duration: 2600, easing: melt }), -1, false);
+  }, [phase]);
   const ring = useAnimatedStyle(() => ({
-    opacity: (stage >= 3 ? 0.55 : 0) * (1 - pulse.value) * (1 - hold.value),
+    opacity: (phase >= 3 ? 0.55 : 0) * (1 - pulse.value) * (1 - hold.value),
     transform: [{ scale: 0.6 + pulse.value * 0.7 + hold.value * 0.4 }],
   }));
-  const p = useTheme();
+
+  // Touching anywhere is enough: the glass fills and blooms on its own,
+  // so a tap, a hold, or a touch the browser interrupts all work.
+  const begin = () => {
+    if (hold.value > 0 || done.value === 1) return;
+    feel.touch();
+    hold.value = withTiming(1, { duration: 1400, easing: Easing.inOut(Easing.quad) });
+  };
+
+  // In a browser, listen to the page itself: React Native Web's responder
+  // drops a tap that ends before it is granted, and mice never send touches.
+  // Any touch while this beat shows counts, except on the skip button.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const start = (e: Event) => {
+      const el = e.target as Element | null;
+      if (el?.closest?.('[aria-label="Skip the welcome"]')) return;
+      begin();
+    };
+    const kinds = ['pointerdown', 'touchstart', 'mousedown', 'keydown'] as const;
+    kinds.forEach((t) => document.addEventListener(t, start, { capture: true, passive: true }));
+    return () => kinds.forEach((t) => document.removeEventListener(t, start, { capture: true }));
+  }, []);
 
   return (
-    <Pressable
+    <View
       style={StyleSheet.absoluteFill}
-      // Touching the light is enough: the glass fills and blooms on its own,
-      // so a tap, a hold, or a touch the browser interrupts all work.
-      onPressIn={() => {
-        if (hold.value > 0) return;
-        feel.touch();
-        hold.value = withTiming(1, { duration: 1400, easing: Easing.inOut(Easing.quad) });
-      }}
+      // a raw touch starts it on phones; no press or release is needed
+      onTouchStart={begin}
+      onStartShouldSetResponder={() => { begin(); return false; }}
+      accessible
       accessibilityRole="button"
       accessibilityLabel="Touch the light to begin"
       accessibilityActions={[{ name: 'activate' }]}
-      onAccessibilityAction={() => { hold.value = withTiming(1, { duration: 600 }); }}
+      onAccessibilityAction={begin}
     >
-      <View style={[styles.arriveText, { top: H * 0.2 }]} pointerEvents="none">
-        <Reveal show={stage >= 1} duration={1400}>
-          <Txt variant="display" align="center" style={{ fontSize: 46, lineHeight: 50 }}>Breathe out.</Txt>
+      <Column gap={22 * k} scroll={false}>
+        <Reveal show={phase >= 1} duration={1400}>
+          <Txt variant="display" align="center" style={{ fontSize: 46, lineHeight: 52 }}>Breathe out.</Txt>
         </Reveal>
-        <Reveal show={stage >= 2} duration={1400} style={{ marginTop: 14 }}>
+        <Reveal show={phase >= 2} duration={1400}>
           <Txt variant="body" tone="soft" align="center">Your head wasn't built{'\n'}to hold everything.</Txt>
         </Reveal>
-      </View>
-      <Animated.View pointerEvents="none" style={[styles.ring, { left: W / 2 - 70, top: H * 0.5 - 70, borderColor: p.inkSoft }, ring]} />
-      <View style={[styles.holdHint, { top: H * 0.5 + 96 }]} pointerEvents="none">
-        <Reveal show={stage >= 3} duration={1200}>
+        <View ref={mark} collapsable={false} style={{ width: LIGHT, height: LIGHT, alignSelf: 'center', alignItems: 'center', justifyContent: 'center' }} pointerEvents="none">
+          <Animated.View style={[styles.ring, { borderColor: p.inkSoft, width: LIGHT * 0.93, height: LIGHT * 0.93, borderRadius: LIGHT }, ring]} />
+        </View>
+        <Reveal show={phase >= 3} duration={1200}>
           <Txt variant="whisper" tone="soft" align="center">touch the light</Txt>
         </Reveal>
-      </View>
-    </Pressable>
+      </Column>
+    </View>
   );
 }
 
 /* ---------- 2. catch your first thought ---------- */
 
-function CatchBeat({ hero, pebble, spark, onNext }: { hero: FreeShape; pebble: FreeShape; spark: Spark; onNext: () => void }) {
+function CatchBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
   const p = useTheme();
-  const { width: W, height: H } = useWindowDimensions();
+  const k = useTypeScale();
+  const { height: H } = useWindowDimensions();
+  const roomy = H > 520;
   const input = useRef<ComponentRef<typeof TextInput>>(null);
   const [text, setText] = useState('');
   const [caught, setCaught] = useState(false);
   const advance = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => clearTimeout(advance.current), []);
-  const stone = { x: 18, w: W - 36, h: 176, cy: H * 0.43 };
+  const mark = useMark(stage);
 
   useEffect(() => {
-    hero.cx.value = withSpring(W / 2, spring.sheet);
-    hero.cy.value = withSpring(stone.cy, spring.sheet);
-    hero.hw.value = withSpring(stone.w / 2, spring.sheet);
-    hero.hh.value = withSpring(stone.h / 2, spring.sheet);
-    hero.radius.value = withSpring(50, spring.sheet);
-    hero.presence.value = withTiming(1, { duration: 400 });
-    hero.warm.value = withTiming(0, { duration: 900 });
-    spark.x.value = withSpring(W - 58, spring.sheet);
-    spark.y.value = withSpring(stone.cy + stone.h / 2 - 26, spring.sheet);
-    spark.i.value = withTiming(0.7, { duration: 900 });
-    spark.r.value = withTiming(5, { duration: 900 });
+    stage.radius.value = 48 * k;
+    stage.anchor.value = { x: 0.88, y: 0.8 };
+    stage.hero.presence.value = withTiming(1, { duration: 400 });
+    stage.hero.warm.value = withTiming(0, { duration: 900 });
+    stage.hero.pearl.value = withTiming(0, { duration: 600 });
+    stage.spark.i.value = withTiming(0.7, { duration: 900 });
+    stage.spark.r.value = withTiming(5, { duration: 900 });
     const t = setTimeout(() => input.current?.focus(), 900);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(advance.current);
+    };
   }, []);
 
   async function save(words: string) {
@@ -223,39 +326,44 @@ function CatchBeat({ hero, pebble, spark, onNext }: { hero: FreeShape; pebble: F
     setText('');
     input.current?.blur();
     feel.catch();
+    const { hero, pebble, spark } = stage;
     hero.sy.value = withSequence(withTiming(0.95, { duration: 110 }), withSpring(1, spring.jelly));
     hero.sx.value = withSequence(withTiming(1.03, { duration: 110 }), withSpring(1, spring.jelly));
     spark.i.value = withSequence(withTiming(2.6, { duration: 120 }), withTiming(0.7, { duration: 900 }));
-    // a drop pinches off the stone and falls
-    pebble.cx.value = W / 2;
-    pebble.cy.value = stone.cy + 20;
+    // a drop pinches off the stone and falls below it
+    const s = stage.target.value;
+    const land = s.y + s.h + Math.min(110, (H - (s.y + s.h)) * 0.5);
+    pebble.cx.value = s.x + s.w / 2;
+    pebble.cy.value = s.y + s.h * 0.6;
     pebble.melt.value = 38;
     pebble.presence.value = withTiming(1, { duration: 360 });
-    pebble.cy.value = withDelay(240, withSpring(H * 0.74, spring.drop));
+    pebble.cy.value = withDelay(240, withSpring(land, spring.drop));
     pebble.melt.value = withDelay(600, withTiming(0, { duration: 400 }));
-    setTimeout(() => { ripple(W / 2, H * 0.74 + 10, 1); feel.land(1); }, 820);
+    setTimeout(() => { ripple(s.x + s.w / 2, land + 10, 1); feel.land(1); }, 820);
     await catchThought(t);
-    advance.current = setTimeout(onNext, 2600);
+    advance.current = setTimeout(onNext, 2400);
   }
 
   return (
-    <View style={StyleSheet.absoluteFill}>
-      <View style={[styles.headline, { top: H * 0.13 }]}>
+    <Column gap={(roomy ? 26 : 16) * k}>
+      <View>
         <Reveal delay={200} duration={1100}>
-          <Txt variant="display" align="center">{caught ? 'Caught.' : 'Catch it the moment\nit appears.'}</Txt>
+          <Txt variant="display" align="center">{caught ? 'Caught.' : 'Catch it the moment it appears.'}</Txt>
         </Reveal>
-        <Reveal delay={600} duration={1100} style={{ marginTop: 10 }}>
-          <Txt variant="whisper" tone="soft" align="center">
-            {caught ? "It's out of your head now. Feel that?" : "Messy is fine. Type what's circling right now."}
-          </Txt>
-        </Reveal>
+        {roomy && (
+          <Reveal delay={600} duration={1100} style={{ marginTop: 8 }}>
+            <Txt variant="whisper" tone="soft" align="center">
+              {caught ? "It's out of your head now. Feel that?" : "Messy is fine. Type what's circling right now."}
+            </Txt>
+          </Reveal>
+        )}
       </View>
 
-      <View style={[styles.stoneText, { top: stone.cy - stone.h / 2, left: stone.x, width: stone.w, height: stone.h }]}>
+      <View ref={mark} collapsable={false} style={[styles.stone, { minHeight: 150 * k }]}>
         <Reveal delay={700} show={!caught}>
-          <Txt variant="whisper" tone="soft" style={{ marginBottom: 10 }}>your first thought</Txt>
+          <Txt variant="whisper" tone="soft" style={{ marginBottom: 8 }}>your first thought</Txt>
           <TextInput
-              underlineColorAndroid="transparent"
+            underlineColorAndroid="transparent"
             ref={input}
             value={text}
             onChangeText={setText}
@@ -274,108 +382,114 @@ function CatchBeat({ hero, pebble, spark, onNext }: { hero: FreeShape; pebble: F
               }
             }}
             keyboardAppearance={p.name === 'night' ? 'dark' : 'light'}
-            style={[styles.thought, { color: p.ink }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
+            style={[styles.thought, { color: p.ink, fontSize: T.thought.fontSize * k, lineHeight: T.thought.lineHeight * k, minHeight: 70 * k },
+              Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
             selectionColor={p.inkSoft}
             accessibilityLabel="Your first thought"
           />
         </Reveal>
       </View>
 
-      {!caught && (
-        <Reveal delay={1100} style={[styles.under, { top: stone.cy + stone.h / 2 + 34 }]}>
-          <GlassButton onPress={() => void save(text || 'call dentist thing')} style={styles.pill} radius={26} pearl={1} label="Catch it">
-            <Txt variant="label">{text.trim() ? 'Catch it' : 'Try “call dentist thing”'}</Txt>
-          </GlassButton>
-        </Reveal>
-      )}
-    </View>
+      <View style={styles.center}>
+        {!caught && (
+          <Reveal delay={1100}>
+            <GlassButton onPress={() => void save(text || 'call dentist thing')} style={styles.pill} radius={26} pearl={1} label="Catch it">
+              <Txt variant="label">{text.trim() ? 'Catch it' : 'Try “call dentist thing”'}</Txt>
+            </GlassButton>
+          </Reveal>
+        )}
+      </View>
+    </Column>
   );
 }
 
 /* ---------- 3. it waits at your desk ---------- */
 
-function DeskBeat({ hero, pebble, spark, onNext }: { hero: FreeShape; pebble: FreeShape; spark: Spark; onNext: () => void }) {
+function DeskBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
   const p = useTheme();
+  const k = useTypeScale();
   const { width: W, height: H } = useWindowDimensions();
+  const roomy = H > 520;
   const [trip, setTrip] = useState<number | null | 'looking'>('looking');
-  const slab = { w: Math.min(300, W - 80), h: 172, cy: H * 0.43 };
+  const mark = useMark(stage);
+  const slabW = Math.min(300, W - 72);
 
   useEffect(() => {
-    hero.hw.value = withSpring(slab.w / 2, spring.sheet);
-    hero.hh.value = withSpring(slab.h / 2, spring.sheet);
-    hero.radius.value = withSpring(22, spring.sheet);
-    hero.cy.value = withSpring(slab.cy, spring.sheet);
-    hero.pearl.value = withTiming(0.1, { duration: 800 });
+    stage.radius.value = 22;
+    stage.anchor.value = { x: 0.5, y: 1.18 };
+    stage.hero.pearl.value = withTiming(0.1, { duration: 800 });
+    stage.spark.i.value = withTiming(0.5, { duration: 600 });
     // the pebble rises into the desk and is absorbed by it
-    pebble.melt.value = 44;
-    pebble.cy.value = withDelay(500, withSpring(slab.cy + 10, spring.sheet));
-    pebble.presence.value = withDelay(1000, withTiming(0, { duration: 700 }));
-    spark.x.value = withSpring(W / 2, spring.sheet);
-    spark.y.value = withSpring(slab.cy + slab.h / 2 + 30, spring.sheet);
-    spark.i.value = withTiming(0.5, { duration: 600 });
-    const t = setTimeout(() => feel.land(0.4), 1500);
+    const t0 = setTimeout(() => {
+      const s = stage.target.value;
+      stage.pebble.melt.value = 44;
+      stage.pebble.cx.value = withSpring(s.x + s.w / 2, spring.sheet);
+      stage.pebble.cy.value = withSpring(s.y + s.h / 2, spring.sheet);
+      stage.pebble.presence.value = withDelay(500, withTiming(0, { duration: 700 }));
+    }, 450);
+    const t1 = setTimeout(() => feel.land(0.4), 1500);
     void ping(guessedServerUrl()).then((ms) => setTrip(ms));
-    return () => clearTimeout(t);
+    return () => { clearTimeout(t0); clearTimeout(t1); };
   }, []);
 
   const status = trip === 'looking' ? 'looking for your desk…' : trip === null ? 'no desk yet · everything waits safely here' : `found your desk · ${trip} ms away`;
 
   return (
-    <View style={StyleSheet.absoluteFill}>
-      <View style={[styles.headline, { top: H * 0.13 }]}>
+    <Column gap={(roomy ? 22 : 14) * k}>
+      <View>
         <Reveal delay={150} duration={1100}>
           <Txt variant="display" align="center">It waits at your desk.</Txt>
         </Reveal>
-        <Reveal delay={500} duration={1100} style={{ marginTop: 10 }}>
-          <Txt variant="whisper" tone="soft" align="center">
-            One key on your computer opens Shuchu.{'\n'}Everything you caught is already there.
-          </Txt>
-        </Reveal>
+        {roomy && (
+          <Reveal delay={500} duration={1100} style={{ marginTop: 8 }}>
+            <Txt variant="whisper" tone="soft" align="center">One key on your computer opens Shuchu. Everything you caught is already there.</Txt>
+          </Reveal>
+        )}
       </View>
 
-      <View style={[styles.slabText, { top: slab.cy - slab.h / 2, height: slab.h, left: (W - slab.w) / 2, width: slab.w }]} pointerEvents="none">
-        <Reveal delay={900}>
-          <Txt variant="caps" tone="soft" align="center">AT YOUR DESK</Txt>
-          <Txt variant="numeral" align="center" style={{ fontSize: 64, lineHeight: 70 }}>1</Txt>
-          <Txt variant="whisper" tone="soft" align="center">thought waiting · how long do you have?</Txt>
-        </Reveal>
+      <View style={styles.center}>
+        <View ref={mark} collapsable={false} style={[styles.slab, { width: slabW, height: 150 * k }]} pointerEvents="none">
+          <Reveal delay={900}>
+            <Txt variant="caps" tone="soft" align="center">AT YOUR DESK</Txt>
+            <Txt variant="numeral" align="center" style={{ fontSize: 60, lineHeight: 66 }}>1</Txt>
+            <Txt variant="whisper" tone="soft" align="center">thought waiting</Txt>
+          </Reveal>
+        </View>
+        <View style={[styles.deskBase, { width: slabW + 56, backgroundColor: p.inkFaint }]} />
       </View>
-      <View style={[styles.deskBase, { top: slab.cy + slab.h / 2 + 12, left: (W - slab.w - 60) / 2, width: slab.w + 60, backgroundColor: p.inkFaint }]} />
 
-      <Reveal delay={1300} style={[styles.under, { top: slab.cy + slab.h / 2 + 60 }]}>
+      <Reveal delay={1200} style={styles.center}>
         <View style={styles.statusRow}>
           <View style={[styles.liveDot, { backgroundColor: typeof trip === 'number' ? p.inkSoft : 'transparent', borderColor: p.inkFaint }]} />
-          <Txt variant="whisper" tone="soft">{status}</Txt>
+          <Txt variant="whisper" tone="soft" style={{ flexShrink: 1 }}>{status}</Txt>
         </View>
-        <GlassButton onPress={onNext} style={[styles.pill, { marginTop: 22 }]} radius={26} pearl={1} label="Continue">
+        <GlassButton onPress={onNext} style={[styles.pill, { marginTop: 18 * k }]} radius={26} pearl={1} label="Continue">
           <Txt variant="label">Continue</Txt>
         </GlassButton>
-        <Txt variant="whisper" tone="faint" align="center" style={{ marginTop: 12 }}>you can link a desk any time in Settings</Txt>
+        {roomy && <Txt variant="whisper" tone="faint" align="center" style={{ marginTop: 10 }}>you can link a desk any time in Settings</Txt>}
       </Reveal>
-    </View>
+    </Column>
   );
 }
 
 /* ---------- 4. the evening question ---------- */
 
-function EveningBeat({ hero, spark, onNext }: { hero: FreeShape; spark: Spark; onNext: () => void }) {
-  const { width: W, height: H } = useWindowDimensions();
+function EveningBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
+  const k = useTypeScale();
+  const { height: H } = useWindowDimensions();
+  const roomy = H > 560;
   const s = useSettings((x) => x);
   const minutes = s.eveningHour * 60 + s.eveningMinute;
   const index = Math.max(0, EVENING.findIndex((m) => m >= minutes));
-  const moon = { cy: H * 0.2, r: 36 };
+  const mark = useMark(stage);
+  const MOON = 64 * k;
 
   useEffect(() => {
-    hero.cx.value = withSpring(W / 2, spring.sheet);
-    hero.cy.value = withSpring(moon.cy, spring.sheet);
-    hero.hw.value = withSpring(moon.r, spring.sheet);
-    hero.hh.value = withSpring(moon.r, spring.sheet);
-    hero.radius.value = withSpring(moon.r, spring.sheet);
-    hero.pearl.value = withTiming(0.75, { duration: 1000 });
-    hero.warm.value = withTiming(0.25, { duration: 1000 });
-    spark.x.value = withSpring(W / 2 + 12, spring.sheet);
-    spark.y.value = withSpring(moon.cy - 10, spring.sheet);
-    spark.i.value = withTiming(0.35, { duration: 800 });
+    stage.radius.value = -1;
+    stage.anchor.value = { x: 0.66, y: 0.3 };
+    stage.hero.pearl.value = withTiming(0.75, { duration: 1000 });
+    stage.hero.warm.value = withTiming(0.25, { duration: 1000 });
+    stage.spark.i.value = withTiming(0.35, { duration: 800 });
   }, []);
 
   const onDial = useCallback((i: number) => {
@@ -390,54 +504,58 @@ function EveningBeat({ hero, spark, onNext }: { hero: FreeShape; spark: Spark; o
   }
 
   return (
-    <View style={StyleSheet.absoluteFill}>
-      <View style={[styles.headline, { top: moon.cy + moon.r + 34 }]}>
+    <Column gap={(roomy ? 16 : 10) * k}>
+      <View style={styles.center}>
+        <View ref={mark} collapsable={false} style={{ width: MOON, height: MOON }} />
+      </View>
+      <View>
         <Reveal delay={200} duration={1100}>
-          <Txt variant="display" align="center">One quiet question,{'\n'}each evening.</Txt>
+          <Txt variant="display" align="center">One quiet question, each evening.</Txt>
         </Reveal>
-        <Reveal delay={600} duration={1100} style={{ marginTop: 10 }}>
-          <Txt variant="whisper" tone="soft" align="center">“Anything still in your head?” Nothing else, ever.</Txt>
-        </Reveal>
+        {roomy && (
+          <Reveal delay={600} duration={1100} style={{ marginTop: 8 }}>
+            <Txt variant="whisper" tone="soft" align="center">“Anything still in your head?” Nothing else, ever.</Txt>
+          </Reveal>
+        )}
       </View>
 
-      <Reveal delay={900} style={[styles.under, { top: H * 0.52 }]}>
+      <Reveal delay={900} style={styles.center}>
         <View style={styles.clockRow}>
-          <Txt variant="numeral">{formatClock(s.eveningHour, s.eveningMinute).replace(/ (AM|PM)/, '')}</Txt>
+          <Txt variant="numeral" style={{ fontSize: 76, lineHeight: 82 }}>{formatClock(s.eveningHour, s.eveningMinute).replace(/ (AM|PM)/, '')}</Txt>
           <Txt variant="title" tone="faint" style={{ fontFamily: font.thin }}>PM</Txt>
         </View>
         <View style={{ width: '100%' }}>
-          <Dial values={EVENING} index={index} onChange={onDial} label={label} step={22} subdivisions={1} />
+          <Dial values={EVENING} index={index} onChange={onDial} label={label} step={22} subdivisions={1} height={100} />
         </View>
-        <GlassButton onPress={() => void yes()} style={[styles.pill, { marginTop: 18 }]} radius={26} pearl={1} label="Ask me each evening">
+        <GlassButton onPress={() => void yes()} style={[styles.pill, { marginTop: 10 * k }]} radius={26} pearl={1} label="Ask me each evening">
           <Txt variant="label">Ask me at {formatClock(s.eveningHour, s.eveningMinute)}</Txt>
         </GlassButton>
-        <Txt variant="whisper" tone="soft" align="center" style={{ marginTop: 14 }} onPress={() => { updateSettings({ eveningOn: false }); onNext(); }} accessibilityRole="button">
-          not now
-        </Txt>
+        <Pressable onPress={() => { updateSettings({ eveningOn: false }); onNext(); }} hitSlop={12} accessibilityRole="button" style={{ marginTop: 12 }}>
+          <Txt variant="whisper" tone="soft" align="center">not now</Txt>
+        </Pressable>
       </Reveal>
-    </View>
+    </Column>
   );
 }
 
 /* ---------- 5. you're clear ---------- */
 
-function ClearBeat({ hero, spark, onDone }: { hero: FreeShape; spark: Spark; onDone: () => void }) {
+function ClearBeat({ stage, onDone }: { stage: Stage; onDone: () => void }) {
   const { width: W, height: H } = useWindowDimensions();
+  const k = useTypeScale();
+  const orb = useSharedValue(1); // 1 = the bright orb, 0 = settling into a stone
+
   useEffect(() => {
     feel.bloom();
-    hero.cx.value = withSpring(W / 2, spring.sheet);
-    hero.cy.value = withSpring(H * 0.46, spring.sheet);
-    hero.hw.value = withSequence(withSpring(96, spring.jelly), withDelay(900, withSpring(W / 2 - 18, spring.sheet)));
-    hero.hh.value = withSequence(withSpring(96, spring.jelly), withDelay(900, withSpring(94, spring.sheet)));
-    hero.radius.value = withSequence(withSpring(96, spring.jelly), withDelay(900, withSpring(52, spring.sheet)));
-    hero.pearl.value = withTiming(0, { duration: 1200 });
-    hero.warm.value = withSequence(withTiming(0.8, { duration: 300 }), withTiming(0, { duration: 1600 }));
-    spark.x.value = withSpring(W / 2, spring.sheet);
-    spark.y.value = withSpring(H * 0.46, spring.sheet);
-    spark.i.value = withSequence(withTiming(3.2, { duration: 350 }), withTiming(0, { duration: 1800, easing: melt }));
-    spark.r.value = withSequence(withTiming(14, { duration: 350 }), withTiming(6, { duration: 1800 }));
-    ripple(W / 2, H * 0.46, 1.4);
-    const t1 = setTimeout(() => { hero.presence.value = withTiming(0, { duration: 900, easing: melt }); }, 2100);
+    stage.anchor.value = { x: 0.5, y: 0.5 };
+    stage.hero.presence.value = withTiming(1, { duration: 300 });
+    stage.hero.pearl.value = withTiming(0, { duration: 1200 });
+    stage.hero.warm.value = withSequence(withTiming(0.8, { duration: 300 }), withTiming(0, { duration: 1600 }));
+    stage.spark.i.value = withSequence(withTiming(3.2, { duration: 350 }), withTiming(0, { duration: 1800, easing: melt }));
+    stage.spark.r.value = withSequence(withTiming(14, { duration: 350 }), withTiming(6, { duration: 1800 }));
+    ripple(W / 2, H / 2, 1.4);
+    orb.value = withDelay(1100, withTiming(0, { duration: 10 }));
+    const t1 = setTimeout(() => { stage.hero.presence.value = withTiming(0, { duration: 900, easing: melt }); }, 2100);
     const t2 = setTimeout(() => {
       updateSettings({ onboarded: true });
       onDone();
@@ -445,8 +563,20 @@ function ClearBeat({ hero, spark, onDone }: { hero: FreeShape; spark: Spark; onD
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
+  // a bright orb, then a stone the width of the screen, ready for capture
+  useFrameCallback(() => {
+    const r = Math.min(96 * k, W * 0.3);
+    if (orb.value > 0.5) {
+      stage.radius.value = r;
+      stage.target.value = { x: W / 2 - r, y: H / 2 - r, w: r * 2, h: r * 2 };
+    } else {
+      stage.radius.value = 50 * k;
+      stage.target.value = { x: 18, y: H / 2 - 92 * k, w: W - 36, h: 184 * k };
+    }
+  });
+
   return (
-    <View style={[styles.headline, { top: H * 0.46 - 30 }]} pointerEvents="none">
+    <View style={[StyleSheet.absoluteFill, styles.clear]} pointerEvents="none">
       <Reveal delay={350} duration={1200}>
         <Txt variant="display" align="center" style={{ fontSize: 52, lineHeight: 58 }}>You're clear.</Txt>
       </Reveal>
@@ -455,23 +585,22 @@ function ClearBeat({ hero, spark, onDone }: { hero: FreeShape; spark: Spark; onD
 }
 
 const styles = StyleSheet.create({
-  top: { position: 'absolute', left: 26, right: 26, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  column: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 22 },
+  center: { alignItems: 'center' },
+  top: { position: 'absolute', left: 22, right: 22, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   skip: { position: 'absolute', right: 0 },
   dots: { flexDirection: 'row', gap: 6, alignItems: 'center' },
   dotStep: { height: 5, borderRadius: 3 },
-  arriveText: { position: 'absolute', left: 30, right: 30 },
-  holdHint: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
-  ring: { position: 'absolute', width: 140, height: 140, borderRadius: 70, borderWidth: 1 },
-  headline: { position: 'absolute', left: 28, right: 28 },
-  stoneText: { position: 'absolute', paddingHorizontal: 28, paddingTop: 26 },
-  thought: { ...T.thought, fontFamily: font.thin, padding: 0, minHeight: 80, textAlignVertical: 'top' },
-  under: { position: 'absolute', left: 28, right: 28, alignItems: 'center' },
-  pill: { height: 54, paddingHorizontal: 28, minWidth: 200 },
-  slabText: { position: 'absolute', justifyContent: 'center' },
-  deskBase: { position: 'absolute', height: StyleSheet.hairlineWidth * 2, borderRadius: 1 },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  ring: { borderWidth: 1 },
+  stone: { paddingHorizontal: 26, paddingTop: 22, paddingBottom: 24 },
+  thought: { ...T.thought, fontFamily: font.thin, padding: 0, textAlignVertical: 'top' },
+  pill: { height: 52, paddingHorizontal: 26, minWidth: 190 },
+  slab: { justifyContent: 'center' },
+  deskBase: { height: StyleSheet.hairlineWidth * 2, borderRadius: 1, marginTop: 10 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10 },
   liveDot: { width: 6, height: 6, borderRadius: 3, borderWidth: 1 },
   clockRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+  clear: { justifyContent: 'center', paddingHorizontal: 22 },
 });
 
 export type { Beat };
