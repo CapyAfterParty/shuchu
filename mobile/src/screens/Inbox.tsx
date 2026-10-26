@@ -2,7 +2,7 @@
 // Swipe right to clear it, left to let it go (with a reason, never a plain delete).
 
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, {
   interpolate,
@@ -23,6 +23,7 @@ import { GlassButton } from '../ui/GlassButton';
 import { Icon } from '../ui/Icon';
 import { Reveal } from '../ui/motion';
 import { SheetHeader } from '../ui/SheetHeader';
+import { ScrollArea } from '../ui/ScrollArea';
 import { Txt } from '../ui/Txt';
 
 const SWIPE = 90; // points of finger travel that commit a swipe
@@ -79,7 +80,7 @@ export function Inbox({ onClose, onOpen }: { onClose: () => void; onOpen: (id: s
     <View style={styles.fill}>
       <SheetHeader title="Inbox" onClose={onClose} closeLabel="Close inbox" />
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollArea contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {empty && (
           <Reveal delay={200} style={styles.empty}>
             <Txt variant="display" align="center" tone="soft">All clear.</Txt>
@@ -113,7 +114,7 @@ export function Inbox({ onClose, onOpen }: { onClose: () => void; onOpen: (id: s
             </View>
           </Reveal>
         )}
-      </ScrollView>
+      </ScrollArea>
     </View>
   );
 }

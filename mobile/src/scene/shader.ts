@@ -25,6 +25,8 @@ uniform float2 light;      // unit direction towards the light, screen space
 uniform float2 tilt;       // parallax, -1..1
 uniform float haze;        // 0..1 deepens the depth of field behind sheets
 uniform float quality;     // 1 = full, 0 = lighter path for slower phones
+uniform float viewScale;   // canvas pixels per screen point, over density (<1 = rendered smaller, scaled up)
+uniform float glassOn;     // 0 = Porcelain: atmosphere and sparks only, surfaces are drawn natively
 uniform float shapeCount;  // live shapes, packed at the front of the arrays
 uniform float upperCount;  // how many of them rest on sheets (layer 1)
 
@@ -256,7 +258,16 @@ float igNoise(float2 p) {
   return fract(52.9829189 * fract(dot(p, float2(0.06711056, 0.00583715))));
 }
 
-half4 main(float2 p) {
+half4 main(float2 pos) {
+  // the canvas may be rendered smaller than the screen and scaled up; all
+  // the world below is in screen points
+  float2 p = pos / viewScale;
+  if (glassOn < 0.5) {
+    // sparks are drawn natively above the porcelain surfaces
+    float3 air0 = atmosphere(rippled(p), 0.0);
+    float g0 = igNoise(floor(pos) + floor(time * 0.024) * float2(37.0, 17.0)) - 0.5;
+    return half4(air0 + g0 * (0.012 + night * 0.01), 1.0);
+  }
   float3 col = baseLayer(p);
 
   // beads and controls resting on the sheets: they cast shadows onto the
@@ -294,7 +305,7 @@ half4 main(float2 p) {
   }
 
   // film grain + dither
-  float2 gp = floor(p * density);
+  float2 gp = floor(pos);
   float grain = igNoise(gp + floor(time * 0.024) * float2(37.0, 17.0)) - 0.5;
   col += grain * (0.018 + night * 0.012);
   return half4(col, 1.0);

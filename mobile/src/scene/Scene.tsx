@@ -3,13 +3,15 @@
 
 import { Canvas, Fill, Shader, Skia, useClock } from '@shopify/react-native-skia';
 import { useMemo } from 'react';
-import { PixelRatio, StyleSheet, useWindowDimensions } from 'react-native';
+import { PixelRatio, useWindowDimensions } from 'react-native';
 import {
   useDerivedValue,
   useFrameCallback,
   useSharedValue,
 } from 'react-native-reanimated';
+import { useSettings } from '../data/settings';
 import { mist, night, type Rgb } from '../theme/tokens';
+import { FlatSurfaces } from './FlatSurfaces';
 import { RIPPLES, sceneShader, SLOTS, SPARKS } from './shader';
 import { useRotation } from './useRotation';
 import { haze, motion, ripples, sceneClock, slots, sparks, themeBlend } from './world';
@@ -22,6 +24,11 @@ const BASE_LIGHT = { x: -0.46, y: -0.89 };
 export function Scene() {
   const { width, height } = useWindowDimensions();
   const density = PixelRatio.get();
+  const porcelain = useSettings((x) => x.porcelain);
+  // The scene is soft by nature, so it never needs every physical pixel:
+  // glass renders at about 2x (crisp rims), Porcelain's air at about 1x.
+  // The canvas is drawn smaller and scaled up by the compositor.
+  const viewScale = Math.min(1, (porcelain ? 1 : 2) / density);
   const clock = useClock();
   const rotation = useRotation();
 
@@ -126,6 +133,8 @@ export function Scene() {
       tilt: [t.x, t.y],
       haze: haze.value,
       quality: quality.value,
+      viewScale,
+      glassOn: porcelain ? 0 : 1,
       shapeCount: count,
       upperCount: upper,
       air: mixc(mist.air, night.air),
@@ -150,13 +159,24 @@ export function Scene() {
     };
   });
 
-  const style = useMemo(() => StyleSheet.flatten([StyleSheet.absoluteFill, { width, height }]), [width, height]);
+  const style = useMemo(() => ({
+    position: 'absolute' as const,
+    left: 0,
+    top: 0,
+    width: width * viewScale,
+    height: height * viewScale,
+    transformOrigin: 'left top',
+    transform: [{ scale: 1 / viewScale }],
+  }), [width, height, viewScale]);
 
   return (
-    <Canvas style={style} pointerEvents="none">
-      <Fill>
-        <Shader source={effect!} uniforms={uniforms} />
-      </Fill>
-    </Canvas>
+    <>
+      <Canvas style={style} pointerEvents="none">
+        <Fill>
+          <Shader source={effect!} uniforms={uniforms} />
+        </Fill>
+      </Canvas>
+      {porcelain && <FlatSurfaces />}
+    </>
   );
 }

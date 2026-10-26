@@ -18,6 +18,8 @@ export interface Settings {
   sound: boolean;
   appearance: Appearance;
   calmMotion: boolean;
+  /** Porcelain: surfaces drawn flat and fast, for phones that find the glass heavy. */
+  porcelain: boolean;
 }
 
 const KEY = 'shuchu.settings.v1';
@@ -32,6 +34,7 @@ export const defaults: Settings = {
   sound: false,
   appearance: 'auto',
   calmMotion: false,
+  porcelain: false,
 };
 
 export const settings = createStore<Settings>(defaults);

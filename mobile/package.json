@@ -46,7 +46,8 @@
     "web": "expo start --web",
     "postinstall": "setup-skia-web public",
     "typecheck": "tsc --noEmit",
-    "export:web": "expo export --platform web && cp public/canvaskit.wasm dist/ && node scripts/relative-web.mjs dist"
+    "export:web": "expo export --platform web && cp public/canvaskit.wasm dist/ && node scripts/relative-web.mjs dist",
+    "test": "node --experimental-strip-types --no-warnings scripts/estimate.test.ts"
   },
   "private": true
 }

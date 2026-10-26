@@ -6,10 +6,9 @@
 // frame the glass springs towards wherever that placeholder actually is.
 
 import { type ComponentRef, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
-  measure,
   type SharedValue,
   useAnimatedReaction,
   useAnimatedRef,
@@ -36,6 +35,7 @@ import { font, spring, type as T } from '../theme/tokens';
 import { Dial } from '../ui/Dial';
 import { GlassButton } from '../ui/GlassButton';
 import { melt, Reveal } from '../ui/motion';
+import { placeOnScreen, ScrollArea, useScrollTrack } from '../ui/ScrollArea';
 import { Txt } from '../ui/Txt';
 import { EVENING } from './Settings';
 
@@ -133,7 +133,7 @@ function Column({ children, gap, scroll = true }: { children: ReactNode; gap: nu
     );
   }
   return (
-    <ScrollView
+    <ScrollArea
       style={StyleSheet.absoluteFill}
       contentContainerStyle={[styles.column, { gap, paddingTop: insets.top + 48, paddingBottom: insets.bottom + 24 }]}
       keyboardShouldPersistTaps="handled"
@@ -141,17 +141,18 @@ function Column({ children, gap, scroll = true }: { children: ReactNode; gap: nu
       bounces={false}
     >
       {children}
-    </ScrollView>
+    </ScrollArea>
   );
 }
 
 /** Marks where the hero glass should be; the stage follows it every frame. */
 function useMark(stage: Stage, shape?: (m: Frame) => Frame) {
   const ref = useAnimatedRef<View>();
+  const track = useScrollTrack();
   useFrameCallback(() => {
-    const m = measure(ref);
-    if (!m || !m.width) return;
-    const f = { x: m.pageX, y: m.pageY, w: m.width, h: m.height };
+    const m = placeOnScreen(ref, track);
+    if (!m || !m.w) return;
+    const f = { x: m.x, y: m.y, w: m.w, h: m.h };
     stage.target.value = shape ? shape(f) : f;
   });
   return ref;

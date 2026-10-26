@@ -1,10 +1,11 @@
 // One thought, up close. Your words stay exactly as you said them; every
 // guess around them can be fixed with one touch.
 
-import { useCallback, useEffect, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform, StyleSheet, TextInput, View } from 'react-native';
 import type { NotDoingReason, Place, Task } from '../../../shared/task';
 import { ESTIMATES } from '../data/guess';
+import { rememberTiming } from '../data/learn';
 import { updateTask, useTasks } from '../data/tasks';
 import { feel } from '../feel/feel';
 import { useTheme } from '../theme/theme';
@@ -15,6 +16,7 @@ import { Icon } from '../ui/Icon';
 import { LiquidChoice } from '../ui/Liquid';
 import { Reveal } from '../ui/motion';
 import { SheetHeader } from '../ui/SheetHeader';
+import { ScrollArea } from '../ui/ScrollArea';
 import { Txt } from '../ui/Txt';
 import { REASONS } from './Inbox';
 
@@ -32,10 +34,16 @@ export function Detail({ id, onClose }: { id: string; onClose: () => void }) {
 
   useEffect(() => setShown(ESTIMATES[estIndex]), [estIndex]);
 
+  // a re-timing teaches future guesses, once the dial has come to rest
+  const lesson = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(lesson.current), []);
   const onDial = useCallback((i: number) => {
     setShown(ESTIMATES[i]);
     void updateTask(id, { estimateMinutes: ESTIMATES[i] });
-  }, [id]);
+    clearTimeout(lesson.current);
+    const words = task?.originalText;
+    if (words) lesson.current = setTimeout(() => rememberTiming(words, ESTIMATES[i]), 1200);
+  }, [id, task?.originalText]);
   const dialLabel = useCallback((v: number) => (v < 60 ? `${v}m` : `${v / 60}h`), []);
 
   if (!task) return null;
@@ -64,7 +72,7 @@ export function Detail({ id, onClose }: { id: string; onClose: () => void }) {
     <View style={styles.fill}>
       <SheetHeader onClose={onClose} />
 
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollArea contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <Reveal delay={120}>
           <TextInput
             underlineColorAndroid="transparent"
@@ -168,7 +176,7 @@ export function Detail({ id, onClose }: { id: string; onClose: () => void }) {
             </>
           )}
         </Reveal>
-      </ScrollView>
+      </ScrollArea>
     </View>
   );
 }

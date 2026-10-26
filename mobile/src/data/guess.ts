@@ -4,7 +4,10 @@
 
 import type { Place, Task, TaskPatch } from '../../../shared/task';
 
-export const ESTIMATES = [5, 10, 15, 25, 45, 60, 90, 120] as const;
+import { ESTIMATES, nearestEstimate, personalEstimate } from './estimate';
+import { currentLessons } from './learn';
+
+export { ESTIMATES, nearestEstimate };
 
 const FILLER = [
   /^(i\s+)?(need|have|got|want)\s+to\s+/i,
@@ -16,18 +19,18 @@ const FILLER = [
 
 const ERRAND = /\b(buy|pick\s*up|grab|groceries|grocery|supermarket|store|shop|shopping|pharmacy|chemist|post\s*office|parcel|drop\s*off|return\s+\w+\s+(to|at)|gym|bank|atm|haircut|barber|car\s*wash|petrol|gas\s+station|dry\s*clean|laundry|collect|vet)\b/i;
 
-const RULES: { match: RegExp; minutes: number; step: (thing: string) => string }[] = [
-  { match: /^(call|phone|ring)\s+(.+)/i, minutes: 10, step: (x) => `Find ${possessive(x)} number` },
-  { match: /^(email|e-mail|reply\s+to|reply|message|text|write\s+back\s+to)\s+(.+)/i, minutes: 10, step: (x) => `Open the thread with ${x}` },
-  { match: /^(book|schedule|arrange)\s+(.+)/i, minutes: 10, step: () => 'Open the calendar and pick two times' },
-  { match: /^(pay|invoice|bill)\s*(.*)/i, minutes: 15, step: () => 'Open the invoice' },
-  { match: /^(fix|debug|repair|sort\s+out)\s+(.+)/i, minutes: 45, step: (x) => `Make ${x} go wrong once, on purpose` },
-  { match: /^(write|draft|finish)\s+(.+)/i, minutes: 60, step: () => 'Open the doc and write the first heading' },
-  { match: /^(read|review|check)\s+(.+)/i, minutes: 25, step: (x) => `Open ${x} and read the first page` },
-  { match: /^(plan|design|prepare|prep|research|think\s+about)\s+(.+)/i, minutes: 45, step: (x) => `Write three bullet points about ${x}` },
-  { match: /^(clean|tidy|organi[sz]e)\s+(.+)/i, minutes: 25, step: (x) => `Clear one corner of ${x}` },
-  { match: /^(buy|grab|pick\s*up|get)\s+(.+)/i, minutes: 20, step: (x) => `Add ${x} to the list` },
-  { match: /^(send|submit|upload)\s+(.+)/i, minutes: 10, step: (x) => `Find ${x}` },
+const RULES: { match: RegExp; step: (thing: string) => string }[] = [
+  { match: /^(call|phone|ring)\s+(.+)/i, step: (x) => `Find ${possessive(x)} number` },
+  { match: /^(email|e-mail|reply\s+to|reply|message|text|write\s+back\s+to)\s+(.+)/i, step: (x) => `Open the thread with ${x}` },
+  { match: /^(book|schedule|arrange)\s+(.+)/i, step: () => 'Open the calendar and pick two times' },
+  { match: /^(pay|invoice|bill)\s*(.*)/i, step: () => 'Open the invoice' },
+  { match: /^(fix|debug|repair|sort\s+out)\s+(.+)/i, step: (x) => `Make ${x} go wrong once, on purpose` },
+  { match: /^(write|draft|finish)\s+(.+)/i, step: () => 'Open the doc and write the first heading' },
+  { match: /^(read|review|check)\s+(.+)/i, step: (x) => `Open ${x} and read the first page` },
+  { match: /^(plan|design|prepare|prep|research|think\s+about)\s+(.+)/i, step: (x) => `Write three bullet points about ${x}` },
+  { match: /^(clean|tidy|organi[sz]e)\s+(.+)/i, step: (x) => `Clear one corner of ${x}` },
+  { match: /^(buy|grab|pick\s*up|get)\s+(.+)/i, step: (x) => `Add ${x} to the list` },
+  { match: /^(send|submit|upload)\s+(.+)/i, step: (x) => `Find ${x}` },
 ];
 
 function possessive(name: string): string {
@@ -55,21 +58,17 @@ export function calibration(tasks: Task[]): number {
   return Math.max(0.6, Math.min(2, mean));
 }
 
-export function nearestEstimate(minutes: number): number {
-  return ESTIMATES.reduce((best, m) => (Math.abs(m - minutes) < Math.abs(best - minutes) ? m : best), ESTIMATES[0]);
-}
-
 export function guess(text: string, history: Task[] = []): TaskPatch {
   const title = cleanTitle(text);
   const place = guessPlace(text);
   const rule = RULES.find((r) => r.match.test(title));
   // "Mina about friday" → "Mina": the object is what comes before the details
   const thing = rule ? (title.match(rule.match)?.[2] ?? '').split(/\s+(about|re|regarding|for|on|before|after|by)\s+/i)[0].trim() : '';
-  const base = rule?.minutes ?? (place === 'errand' ? 20 : 25);
   return {
     cleanTitle: title,
     place,
-    estimateMinutes: nearestEstimate(base * calibration(history)),
+    // read the whole original sentence: "quick", "3 emails" and "for 20 min" live there
+    estimateMinutes: personalEstimate(text, currentLessons(), calibration(history)),
     firstStep: rule && thing ? rule.step(thing) : 'Spend two minutes on the first piece',
   };
 }

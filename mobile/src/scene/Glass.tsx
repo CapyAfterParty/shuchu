@@ -8,13 +8,13 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
 import Animated, {
-  measure,
   type SharedValue,
   useAnimatedRef,
   useAnimatedStyle,
   useFrameCallback,
 } from 'react-native-reanimated';
 import { useReveal } from '../ui/motion';
+import { placeOnScreen, useScrollTrack } from '../ui/ScrollArea';
 import { claimSlot, releaseSlot, writeShape } from './world';
 
 type Num = number | SharedValue<number>;
@@ -83,19 +83,20 @@ export function Glass({
   useEffect(() => () => releaseSlot(slot), [slot]);
   const reveal = useReveal();
   const layer = useContext(LayerContext);
+  const track = useScrollTrack();
 
   useFrameCallback(() => {
-    const m = measure(ref);
+    const m = placeOnScreen(ref, track);
     if (!m) return;
     const k = read(scale, 1);
-    if (frame) frame.value = { x: m.pageX + read(dx, 0), y: m.pageY + read(dy, 0), w: m.width, h: m.height };
+    if (frame) frame.value = { x: m.x + read(dx, 0), y: m.y + read(dy, 0), w: m.w, h: m.h };
     writeShape(slot, {
-      cx: m.pageX + m.width / 2 + read(dx, 0),
-      cy: m.pageY + m.height / 2 + read(dy, 0),
-      hw: (m.width / 2) * k,
-      hh: (m.height / 2) * k,
+      cx: m.x + m.w / 2 + read(dx, 0),
+      cy: m.y + m.h / 2 + read(dy, 0),
+      hw: (m.w / 2) * k,
+      hh: (m.h / 2) * k,
       radius: radius * k,
-      presence: Math.max(0, read(presence, 1)) * (reveal ? reveal.value : 1),
+      presence: Math.max(0, read(presence, 1)) * (reveal ? reveal.value : 1) * m.inView,
       melt: read(melt, 0),
       lift: read(lift, 0.5),
       sx: read(sx, 1),
@@ -109,14 +110,17 @@ export function Glass({
   });
 
   const contentStyle = useAnimatedStyle(() => {
-    const p = read(presence, 1);
+    // The content belongs to the glass: it grows from the same centre at the
+    // same rate as the shape (the shader scales shapes by presence) and
+    // condenses into view as the body forms, so it is never outside it.
+    const p = Math.max(0, Math.min(1, read(presence, 1) * (reveal ? reveal.value : 1)));
+    const grow = fadeContent ? 0.2 + 0.8 * p : 1;
     return {
-      // content appears once the glass is nearly formed, so it never floats outside it
-      opacity: fadeContent ? Math.max(0, Math.min(1, (p - 0.78) / 0.22)) : 1,
+      opacity: fadeContent ? Math.max(0, Math.min(1, (p - 0.5) / 0.4)) : 1,
       transform: [
         { translateX: read(dx, 0) },
         { translateY: read(dy, 0) },
-        { scale: read(scale, 1) },
+        { scale: read(scale, 1) * grow },
         { scaleX: read(sx, 1) },
         { scaleY: read(sy, 1) },
       ],
