@@ -143,6 +143,7 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
             frame={stone}
           >
             <TextInput
+              maxFontSizeMultiplier={1.15}
               underlineColorAndroid="transparent"
               ref={input}
               value={text}
@@ -216,7 +217,7 @@ function Ghost({ text, onDone }: { text: string; onDone: () => void }) {
   const p = useTheme();
   const k = useTypeScale();
   return (
-    <Animated.Text numberOfLines={3} style={[styles.input, styles.ghost, { color: p.ink, fontSize: T.thought.fontSize * k, lineHeight: T.thought.lineHeight * k }, a]} pointerEvents="none">
+    <Animated.Text numberOfLines={3} maxFontSizeMultiplier={1.15} style={[styles.input, styles.ghost, { color: p.ink, fontSize: T.thought.fontSize * k, lineHeight: T.thought.lineHeight * k }, a]} pointerEvents="none">
       {text}
     </Animated.Text>
   );

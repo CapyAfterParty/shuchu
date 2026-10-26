@@ -31,6 +31,15 @@ const RULES: { match: RegExp; step: (thing: string) => string }[] = [
   { match: /^(clean|tidy|organi[sz]e)\s+(.+)/i, step: (x) => `Clear one corner of ${x}` },
   { match: /^(buy|grab|pick\s*up|get)\s+(.+)/i, step: (x) => `Add ${x} to the list` },
   { match: /^(send|submit|upload)\s+(.+)/i, step: (x) => `Find ${x}` },
+  { match: /^(do|complete|start|begin|work\s+on|continue|get\s+through)\s+(.+)/i, step: (x) => (
+    /\b(assignment|homework|essay|worksheet|exercises?|problems?|questions?|coursework|lab|report|project)\b/i.test(x)
+      ? `Open ${x} and read what's asked`
+      : `Open ${x} and do the first two minutes`
+  ) },
+  { match: /^(study|revise|learn|practi[sc]e|memori[sz]e)\s+(.+)/i, step: (x) => `Set a ten-minute timer and start on ${x}` },
+  { match: /^(ask|tell|remind|invite|thank)\s+(.+)/i, step: (x) => `Open the chat with ${x}` },
+  { match: /^(go\s+to|visit|drop\s+by|stop\s+by)\s+(.+)/i, step: (x) => `Check when ${x} is open` },
+  { match: /^(cancel|renew|apply\s+for|sign\s+up\s+for|register\s+for)\s+(.+)/i, step: (x) => `Find the page for ${x}` },
 ];
 
 function possessive(name: string): string {
@@ -69,7 +78,7 @@ export function guess(text: string, history: Task[] = []): TaskPatch {
     place,
     // read the whole original sentence: "quick", "3 emails" and "for 20 min" live there
     estimateMinutes: personalEstimate(text, currentLessons(), calibration(history)),
-    firstStep: rule && thing ? rule.step(thing) : 'Spend two minutes on the first piece',
+    firstStep: rule && thing ? rule.step(thing) : 'Give it two minutes, then decide',
   };
 }
 

@@ -71,6 +71,7 @@ export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay:
           <Row>
             <Icon name="link" size={18} color={p.inkFaint} />
             <TextInput
+              maxFontSizeMultiplier={1.15}
               underlineColorAndroid="transparent"
               value={address}
               onChangeText={setAddress}

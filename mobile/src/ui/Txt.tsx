@@ -28,7 +28,8 @@ export function Txt({ variant = 'body', tone = 'ink', align, style, ...rest }: T
     lineHeight: flat.lineHeight ? flat.lineHeight * f : undefined,
     letterSpacing: flat.letterSpacing ? flat.letterSpacing * f : undefined,
   };
-  return <Text {...rest} style={scaled} />;
+  // honour the phone's text size, up to a point the layouts were designed for
+  return <Text maxFontSizeMultiplier={1.15} {...rest} style={scaled} />;
 }
 
 export const AnimatedTxt = Animated.createAnimatedComponent(Txt);

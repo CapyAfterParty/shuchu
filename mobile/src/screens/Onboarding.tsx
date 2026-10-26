@@ -10,6 +10,7 @@ import { Platform, Pressable, StyleSheet, TextInput, useWindowDimensions, View }
 import Animated, {
   Easing,
   type SharedValue,
+  useAnimatedKeyboard,
   useAnimatedReaction,
   useAnimatedRef,
   useAnimatedStyle,
@@ -202,6 +203,9 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
 /** A column that centres its content and scrolls if a screen is too short. */
 function Column({ children, gap, scroll = true }: { children: ReactNode; gap: number; scroll?: boolean }) {
   const insets = useSafeAreaInsets();
+  // Android draws edge to edge, so both system bars are translucent
+  const keyboard = useAnimatedKeyboard({ isStatusBarTranslucentAndroid: true, isNavigationBarTranslucentAndroid: true });
+  const room = useAnimatedStyle(() => ({ height: Math.max(0, keyboard.height.value - insets.bottom) }));
   if (!scroll) {
     return (
       <View style={[StyleSheet.absoluteFill, styles.column, { gap, paddingTop: insets.top + 48, paddingBottom: insets.bottom + 24 }]} pointerEvents="box-none">
@@ -218,6 +222,8 @@ function Column({ children, gap, scroll = true }: { children: ReactNode; gap: nu
       bounces={false}
     >
       {children}
+      {/* the keyboard takes room at the bottom, so the content re-centres above it */}
+      <Animated.View style={[{ marginTop: -gap }, room]} />
     </ScrollArea>
   );
 }
@@ -442,6 +448,7 @@ function CatchBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
       <View ref={mark} collapsable={false} style={[styles.stone, { minHeight: 150 * k }]}>
         <Reveal delay={700} show={!caught}>
           <TextInput
+              maxFontSizeMultiplier={1.15}
             underlineColorAndroid="transparent"
             ref={input}
             value={text}
@@ -494,7 +501,7 @@ function DeskBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
 
   useEffect(() => {
     stage.radius.value = 22;
-    stage.anchor.value = { x: 0.5, y: 1.18 };
+    stage.anchor.value = { x: 0.9, y: 0.82 };
     stage.hero.pearl.value = withTiming(0.1, { duration: 800 });
     stage.spark.i.value = withTiming(0.5, { duration: 600 });
     // the pebble rises into the desk and is absorbed by it
@@ -522,7 +529,6 @@ function DeskBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
             <Txt variant="whisper" tone="soft" align="center">waiting</Txt>
           </Reveal>
         </View>
-        <View style={[styles.deskBase, { width: slabW + 56, backgroundColor: p.inkFaint }]} />
       </View>
 
       <Reveal delay={1200} style={styles.center}>
@@ -661,7 +667,6 @@ const styles = StyleSheet.create({
   thought: { ...T.thought, fontFamily: font.thin, padding: 0, textAlignVertical: 'top' },
   pill: { height: 52, paddingHorizontal: 26, minWidth: 190 },
   slab: { justifyContent: 'center' },
-  deskBase: { height: StyleSheet.hairlineWidth * 2, borderRadius: 1, marginTop: 10 },
   clockRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
   clear: { justifyContent: 'center', paddingHorizontal: 22 },
 });

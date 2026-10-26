@@ -109,7 +109,7 @@ export function LiquidChoice<T extends string>({
               onPress={() => { if (!on) { feel.touch(); onChange(o.value); } }}
             >
               {o.icon && <Icon name={o.icon} size={17} />}
-              <Txt variant="label" tone={on ? 'ink' : 'soft'} style={{ fontSize: 14 }}>{o.label}</Txt>
+              <Txt variant="label" tone={on ? 'ink' : 'soft'} style={{ fontSize: 14, flexShrink: 1 }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{o.label}</Txt>
             </Pressable>
           );
         })}

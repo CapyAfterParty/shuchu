@@ -254,6 +254,14 @@ float3 baseLayer(float2 p) {
   return col;
 }
 
+// A plain hash, not interleaved-gradient noise: IGN has a regular
+// structure that turns into a visible mesh once the canvas is scaled up.
+float grainNoise(float2 p) {
+  float3 q = fract(float3(p.xyx) * 0.1031);
+  q += dot(q, q.yzx + 33.33);
+  return fract((q.x + q.y) * q.z);
+}
+
 float igNoise(float2 p) {
   return fract(52.9829189 * fract(dot(p, float2(0.06711056, 0.00583715))));
 }
@@ -265,8 +273,8 @@ half4 main(float2 pos) {
   if (glassOn < 0.5) {
     // sparks are drawn natively above the porcelain surfaces
     float3 air0 = atmosphere(rippled(p), 0.0);
-    float g0 = igNoise(floor(pos) + floor(time * 0.024) * float2(37.0, 17.0)) - 0.5;
-    return half4(air0 + g0 * (0.012 + night * 0.01), 1.0);
+    float g0 = grainNoise(floor(pos) + floor(time * 0.024) * float2(37.0, 17.0)) - 0.5;
+    return half4(air0 + g0 * (0.006 + night * 0.005), 1.0);
   }
   float3 col = baseLayer(p);
 
@@ -306,8 +314,8 @@ half4 main(float2 pos) {
 
   // film grain + dither
   float2 gp = floor(pos);
-  float grain = igNoise(gp + floor(time * 0.024) * float2(37.0, 17.0)) - 0.5;
-  col += grain * (0.018 + night * 0.012);
+  float grain = grainNoise(gp + floor(time * 0.024) * float2(37.0, 17.0)) - 0.5;
+  col += grain * (0.007 + night * 0.006);
   return half4(col, 1.0);
 }
 `;
