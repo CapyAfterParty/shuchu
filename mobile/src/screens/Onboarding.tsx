@@ -34,8 +34,9 @@ import { useTheme, useTypeScale } from '../theme/theme';
 import { font, spring, type as T } from '../theme/tokens';
 import { Dial } from '../ui/Dial';
 import { GlassButton } from '../ui/GlassButton';
-import { melt, Reveal } from '../ui/motion';
+import { glide, melt, Reveal, RevealContext } from '../ui/motion';
 import { placeOnScreen, ScrollArea, useScrollTrack } from '../ui/ScrollArea';
+import { Headline } from '../ui/Headline';
 import { Txt } from '../ui/Txt';
 import { EVENING } from './Settings';
 
@@ -51,7 +52,11 @@ interface Stage {
   hero: FreeShape;
   pebble: FreeShape;
   spark: { i: SharedValue<number>; r: SharedValue<number>; boost: SharedValue<number>; x: SharedValue<number>; y: SharedValue<number> };
+  /** Dew: small drops around the hero that gather into it, fly off it and fall back. */
+  drops: { show: SharedValue<number>; gather: SharedValue<number>; burst: SharedValue<number>; splash: SharedValue<number> };
 }
+
+const DROPS = 7;
 
 export function Onboarding({ onDone }: { onDone: () => void }) {
   const { width: W, height: H } = useWindowDimensions();
@@ -71,6 +76,51 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const vel = useSharedValue({ cx: 0, cy: 0, hw: 0, hh: 0, r: 0, sx: 0, sy: 0 });
   const [sparkSlot] = useState(claimSpark);
   useEffect(() => () => releaseSpark(sparkSlot), [sparkSlot]);
+
+  // Dew. Each drop has its own orbit, size and pace, so the swarm never looks mechanical.
+  const drops = Array.from({ length: DROPS }, () => useShape({ presence: 0, melt: 30, lift: 0.45, hw: 6, hh: 6, radius: 6 }, 0.8));
+  const [dew] = useState(() => Array.from({ length: DROPS }, (_, i) => ({
+    angle: (i / DROPS) * Math.PI * 2 + Math.random() * 0.6,
+    orbit: 64 + Math.random() * 70,
+    size: 5 + Math.random() * 7,
+    pace: (0.16 + Math.random() * 0.14) * (i % 2 ? 1 : -1),
+    bob: Math.random() * Math.PI * 2,
+    fling: 0.7 + Math.random() * 0.8,
+  })));
+  const dropShow = useSharedValue(0);
+  const dropGather = useSharedValue(0);
+  const dropBurst = useSharedValue(0);
+  const dropSplash = useSharedValue(0);
+  const clock = useSharedValue(0);
+  useFrameCallback((info) => {
+    clock.value += Math.min(info.timeSincePreviousFrame ?? 16, 50) / 1000;
+    const t = clock.value;
+    const cx = hero.cx.value;
+    const cy = hero.cy.value;
+    const body = Math.max(hero.hw.value, hero.hh.value);
+    const g = dropGather.value;
+    const b = dropBurst.value;
+    const sp = dropSplash.value;
+    for (let i = 0; i < DROPS; i++) {
+      const d = dew[i];
+      // gathering spins the swarm inwards, faster as it closes, like water down a drain
+      const ang = d.angle + t * d.pace * (1 + g * 5) + g * g * 4 * Math.sign(d.pace);
+      const home = d.orbit * Math.pow(1 - g, 1.4) + body * 0.35 * g;
+      const out = b * (body + d.orbit * 2.4 * d.fling) + sp * (body * 0.55 + 26 * d.fling);
+      const r = home + out;
+      const wobble = Math.sin(t * 0.9 + d.bob) * 6 * (1 - g);
+      drops[i].cx.value = cx + Math.cos(ang) * (r + wobble);
+      drops[i].cy.value = cy + Math.sin(ang) * (r + wobble) * 0.86 + b * b * 40 * d.fling;
+      const size = d.size * (1 + g * 0.5) * (1 - b * 0.55) * (1 + sp * 0.25);
+      drops[i].hw.value = size;
+      drops[i].hh.value = size * (1 - 0.12 * Math.abs(Math.sin(t * 1.3 + d.bob)));
+      drops[i].radius.value = size;
+      // absorbed into the hero at the end of gathering, dissolving at the end of a burst
+      // (a splash or burst pulls them back out of the hero first)
+      const absorbed = (g > 0.85 ? (g - 0.85) / 0.15 : 0) * (1 - Math.min(1, (sp + b) * 4));
+      drops[i].presence.value = dropShow.value * (1 - absorbed) * (1 - b * b);
+    }
+  });
 
   // A soft spring per frame: the glass flows to its target and overshoots a
   // touch, like something liquid settling. The light rides along inside it.
@@ -104,17 +154,42 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const stage: Stage = {
     target, radius, anchor, hero, pebble,
     spark: { i: sparkI, r: sparkR, boost: sparkBoost, x: sparkX, y: sparkY },
+    drops: { show: dropShow, gather: dropGather, burst: dropBurst, splash: dropSplash },
   };
-  const go = useCallback((b: Beat) => setBeat(b), []);
+
+  // Between beats the words breathe out first, then the next beat condenses
+  // in, while the glass flings a few drops that fall back as it changes shape.
+  const fade = useSharedValue(1);
+  const switching = useRef(false);
+  const go = useCallback((b: Beat) => {
+    if (switching.current) return;
+    switching.current = true;
+    fade.value = withTiming(0, { duration: 300, easing: melt });
+    if (b !== 'clear') {
+      dropShow.value = withSequence(withTiming(1, { duration: 120 }), withDelay(520, withTiming(0, { duration: 380 })));
+      dropSplash.value = withSequence(withTiming(1, { duration: 300, easing: glide }), withTiming(0, { duration: 700, easing: Easing.in(Easing.quad) }));
+      dropGather.value = 1; // they leave from inside the glass
+    }
+    setTimeout(() => {
+      setBeat(b);
+      fade.value = 1;
+      switching.current = false;
+    }, 320);
+  }, []);
+  const fadeStyle = useAnimatedStyle(() => ({ opacity: fade.value }));
   const step = ORDER.indexOf(beat);
 
   return (
     <View style={StyleSheet.absoluteFill}>
-      {beat === 'arrive' && <Arrive stage={stage} onNext={() => go('catch')} />}
-      {beat === 'catch' && <CatchBeat stage={stage} onNext={() => go('desk')} />}
-      {beat === 'desk' && <DeskBeat stage={stage} onNext={() => go('evening')} />}
-      {beat === 'evening' && <EveningBeat stage={stage} onNext={() => go('clear')} />}
-      {beat === 'clear' && <ClearBeat stage={stage} onDone={onDone} />}
+      <RevealContext.Provider value={fade}>
+        <Animated.View style={[StyleSheet.absoluteFill, fadeStyle]} pointerEvents="box-none">
+          {beat === 'arrive' && <Arrive stage={stage} onNext={() => go('catch')} />}
+          {beat === 'catch' && <CatchBeat stage={stage} onNext={() => go('desk')} />}
+          {beat === 'desk' && <DeskBeat stage={stage} onNext={() => go('evening')} />}
+          {beat === 'evening' && <EveningBeat stage={stage} onNext={() => go('clear')} />}
+          {beat === 'clear' && <ClearBeat stage={stage} onDone={onDone} />}
+        </Animated.View>
+      </RevealContext.Provider>
       {step > 0 && step < 4 && <TopBar step={step} onSkip={() => go('clear')} />}
     </View>
   );
@@ -197,6 +272,8 @@ function Arrive({ stage, onNext }: { stage: Stage; onNext: () => void }) {
     stage.radius.value = -1;
     stage.spark.r.value = 6;
     stage.spark.i.value = withDelay(500, withTiming(1, { duration: 2200, easing: melt }));
+    stage.drops.gather.value = 0;
+    stage.drops.show.value = withDelay(900, withTiming(1, { duration: 1800, easing: melt }));
     const timers = [
       setTimeout(() => setPhase(1), 700),
       setTimeout(() => feel.heartbeat(), 1600),
@@ -211,6 +288,7 @@ function Arrive({ stage, onNext }: { stage: Stage; onNext: () => void }) {
   useFrameCallback(() => {
     if (done.value === 1) return;
     const h = hold.value;
+    stage.drops.gather.value = h;
     stage.hero.presence.value = Math.min(1, h * 2.2);
     stage.hero.warm.value = 0.5 * h;
     stage.spark.boost.value = h * 0.9;
@@ -243,7 +321,9 @@ function Arrive({ stage, onNext }: { stage: Stage; onNext: () => void }) {
   const begin = () => {
     if (hold.value > 0 || done.value === 1) return;
     feel.touch();
-    hold.value = withTiming(1, { duration: 1400, easing: Easing.inOut(Easing.quad) });
+    const t = stage.target.value;
+    ripple(t.x + t.w / 2, t.y + t.h / 2, 0.9);
+    hold.value = withTiming(1, { duration: 1700, easing: Easing.inOut(Easing.cubic) });
   };
 
   // In a browser, listen to the page itself: React Native Web's responder
@@ -274,9 +354,7 @@ function Arrive({ stage, onNext }: { stage: Stage; onNext: () => void }) {
       onAccessibilityAction={begin}
     >
       <Column gap={22 * k} scroll={false}>
-        <Reveal show={phase >= 1} duration={1400}>
-          <Txt variant="display" align="center" style={{ fontSize: 44, lineHeight: 50 }}>Breathe out.</Txt>
-        </Reveal>
+        <Headline text="Breathe out." delay={700} stagger={160} style={{ fontSize: 44, lineHeight: 52 }} />
         <View ref={mark} collapsable={false} style={{ width: LIGHT, height: LIGHT, alignSelf: 'center', alignItems: 'center', justifyContent: 'center' }} pointerEvents="none">
           <Animated.View style={[styles.ring, { borderColor: p.inkSoft, width: LIGHT * 0.93, height: LIGHT * 0.93, borderRadius: LIGHT }, ring]} />
         </View>
@@ -344,9 +422,7 @@ function CatchBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
   return (
     <Column gap={(roomy ? 26 : 16) * k}>
       <View>
-        <Reveal delay={200} duration={800}>
-          <Txt variant="display" align="center">{caught ? 'Caught.' : 'What’s on your mind?'}</Txt>
-        </Reveal>
+        <Headline text={caught ? 'Caught.' : 'What’s on your mind?'} delay={caught ? 120 : 220} />
       </View>
 
       <View ref={mark} collapsable={false} style={[styles.stone, { minHeight: 150 * k }]}>
@@ -422,9 +498,7 @@ function DeskBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
   return (
     <Column gap={(roomy ? 22 : 14) * k}>
       <View>
-        <Reveal delay={150} duration={800}>
-          <Txt variant="display" align="center">It waits at your desk.</Txt>
-        </Reveal>
+        <Headline text="It waits at your desk." delay={150} />
       </View>
 
       <View style={styles.center}>
@@ -483,9 +557,7 @@ function EveningBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
         <View ref={mark} collapsable={false} style={{ width: MOON, height: MOON }} />
       </View>
       <View>
-        <Reveal delay={200} duration={800}>
-          <Txt variant="display" align="center">One question,{'\n'}each evening.</Txt>
-        </Reveal>
+        <Headline text={'One question,\neach evening.'} delay={200} />
       </View>
 
       <Reveal delay={900} style={styles.center}>
@@ -523,6 +595,13 @@ function ClearBeat({ stage, onDone }: { stage: Stage; onDone: () => void }) {
     stage.spark.i.value = withSequence(withTiming(3.2, { duration: 350 }), withTiming(0, { duration: 1800, easing: melt }));
     stage.spark.r.value = withSequence(withTiming(14, { duration: 350 }), withTiming(6, { duration: 1800 }));
     ripple(W / 2, H / 2, 1.4);
+    // the orb sheds its dew in every direction, which dissolves as it flies
+    stage.drops.gather.value = 1;
+    stage.drops.splash.value = 0;
+    stage.drops.burst.value = 0;
+    stage.drops.show.value = 1;
+    stage.drops.burst.value = withDelay(120, withTiming(1, { duration: 1500, easing: glide }));
+    setTimeout(() => ripple(W / 2, H / 2, 0.8), 380);
     orb.value = withDelay(1100, withTiming(0, { duration: 10 }));
     const t1 = setTimeout(() => { stage.hero.presence.value = withTiming(0, { duration: 900, easing: melt }); }, 2100);
     const t2 = setTimeout(() => {
@@ -546,9 +625,7 @@ function ClearBeat({ stage, onDone }: { stage: Stage; onDone: () => void }) {
 
   return (
     <View style={[StyleSheet.absoluteFill, styles.clear]} pointerEvents="none">
-      <Reveal delay={350} duration={900}>
-        <Txt variant="display" align="center" style={{ fontSize: 52, lineHeight: 58 }}>You're clear.</Txt>
-      </Reveal>
+      <Headline text="You’re clear." delay={420} stagger={180} style={{ fontSize: 52, lineHeight: 60 }} />
     </View>
   );
 }

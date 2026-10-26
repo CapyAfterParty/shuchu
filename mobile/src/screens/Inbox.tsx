@@ -38,6 +38,8 @@ export function Inbox({ onClose, onOpen }: { onClose: () => void; onOpen: (id: s
   const p = useTheme();
   const tasks = useTasks((s) => s.tasks);
   const outbox = useTasks((s) => s.outbox);
+  // "still on its way" only means something once a desk is linked
+  const linked = useTasks((s) => s.link === 'live');
   const [lettingGo, setLettingGo] = useState<string | null>(null);
 
   const groups = useMemo(() => {
@@ -66,7 +68,7 @@ export function Inbox({ onClose, onOpen }: { onClose: () => void; onOpen: (id: s
     <Reveal key={t.id} delay={120 + i * 45} rise={8}>
       <Row
         task={t}
-        waiting={isWaiting(t.id, outbox)}
+        waiting={linked && isWaiting(t.id, outbox)}
         onPress={() => onOpen(t.id)}
         onClear={() => clear(t)}
         onLetGo={() => { feel.touch(); setLettingGo(lettingGo === t.id ? null : t.id); }}

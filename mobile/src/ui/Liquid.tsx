@@ -3,9 +3,10 @@
 
 import { useEffect, useState } from 'react';
 import { type LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-native';
-import { useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { feel } from '../feel/feel';
 import { Glass } from '../scene/Glass';
+import { useTheme } from '../theme/theme';
 import { spring } from '../theme/tokens';
 import { Icon, type IconName } from './Icon';
 import { Txt } from './Txt';
@@ -19,12 +20,21 @@ export function LiquidSwitch({ value, onChange, label }: { value: boolean; onCha
   const sx = useSharedValue(1);
   const pearl = useSharedValue(value ? 1 : 0.15);
   const warm = useSharedValue(value ? 0.55 : 0);
+  const on = useSharedValue(value ? 1 : 0);
+  const p = useTheme();
+  const night = p.name === 'night';
+  // a solid bead inside the knob, so its place (and so on or off) reads at a glance
+  const bead = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(on.value, [0, 1], night ? ['rgba(255,255,255,0.22)', 'rgba(255,190,150,0.9)'] : ['rgba(255,255,255,0.75)', 'rgba(255,196,160,0.95)']),
+    transform: [{ scale: 0.82 + on.value * 0.1 }],
+  }));
 
   useEffect(() => {
     dx.value = withSpring(value ? TW - KNOB - 8 : 0, spring.jelly);
     sx.value = withSequence(withTiming(1.38, { duration: 140 }), withSpring(1, spring.jelly));
     pearl.value = withTiming(value ? 1 : 0.15, { duration: 360 });
     warm.value = withTiming(value ? 0.55 : 0, { duration: 360 });
+    on.value = withTiming(value ? 1 : 0, { duration: 320 });
   }, [value]);
 
   return (
@@ -38,7 +48,9 @@ export function LiquidSwitch({ value, onChange, label }: { value: boolean; onCha
     >
       <Glass style={styles.track} radius={TH / 2} lift={0.2} melt={6} pearl={0} />
       <View style={styles.knobSpot} pointerEvents="none">
-        <Glass style={styles.knob} radius={KNOB / 2} lift={0.7} melt={6} pearl={pearl} warm={warm} dx={dx} sx={sx} />
+        <Glass style={styles.knob} contentStyle={styles.knobInner} radius={KNOB / 2} lift={0.7} melt={6} pearl={pearl} warm={warm} dx={dx} sx={sx}>
+          <Animated.View style={[styles.knobBead, { boxShadow: night ? '0 1px 3px rgba(0,0,0,0.35)' : '0 1px 3px rgba(40,62,92,0.18)' }, bead]} />
+        </Glass>
       </View>
     </Pressable>
   );
@@ -111,6 +123,8 @@ const styles = StyleSheet.create({
   track: { width: TW, height: TH },
   knobSpot: { position: 'absolute', left: 4, top: (TH - KNOB) / 2 },
   knob: { width: KNOB + 4, height: KNOB },
+  knobInner: { alignItems: 'center', justifyContent: 'center' },
+  knobBead: { width: KNOB - 6, height: KNOB - 6, borderRadius: (KNOB - 6) / 2 },
   choice: { height: 48, padding: 4, justifyContent: 'center' },
   beadSpot: { position: 'absolute', left: 4, top: 4, bottom: 4 },
   bead: { flex: 1 },

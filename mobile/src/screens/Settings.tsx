@@ -88,21 +88,23 @@ export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay:
         </Group>
 
         <Group title="Evening" delay={next()}>
-          <Row>
+          <Row tall={s.eveningOn}>
             <Icon name="moon" size={19} color={p.inkSoft} />
-            <Txt variant="body" style={styles.grow}>Remind me</Txt>
-            {s.eveningOn && (
-              <Txt
-                variant="body"
-                tone="soft"
-                onPress={() => { feel.touch(); setShowTime(!showTime); }}
-                accessibilityRole="button"
-                accessibilityLabel="Change the time"
-                style={styles.value}
-              >
-                {formatClock(s.eveningHour, s.eveningMinute)}
-              </Txt>
-            )}
+            <View style={styles.grow}>
+              <Txt variant="body" numberOfLines={1}>Remind me</Txt>
+              {s.eveningOn && (
+                <Txt
+                  variant="whisper"
+                  tone="soft"
+                  onPress={() => { feel.touch(); setShowTime(!showTime); }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Change the time"
+                  style={styles.sub}
+                >
+                  {formatClock(s.eveningHour, s.eveningMinute)} · {showTime ? 'done' : 'change'}
+                </Txt>
+              )}
+            </View>
             <LiquidSwitch
               label="Evening question"
               value={s.eveningOn}
@@ -212,7 +214,6 @@ const styles = StyleSheet.create({
   tall: { minHeight: 64 },
   grow: { flex: 1, minWidth: 0 },
   sub: { marginTop: 1 },
-  value: { paddingHorizontal: space.xs },
   rule: { height: StyleSheet.hairlineWidth, marginLeft: 31 },
   dot: { width: 8, height: 8, borderRadius: 4, borderWidth: 1, marginHorizontal: 5 },
   test: { height: 32, paddingHorizontal: 14 },
