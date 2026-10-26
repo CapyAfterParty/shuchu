@@ -24,8 +24,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
-import { guessedServerUrl, updateSettings, useSettings } from '../data/settings';
-import { catchThought, ping } from '../data/tasks';
+import { updateSettings, useSettings } from '../data/settings';
+import { catchThought } from '../data/tasks';
 import { askPermission, formatClock } from '../feel/evening';
 import { feel } from '../feel/feel';
 import type { Frame } from '../scene/Glass';
@@ -199,8 +199,7 @@ function Arrive({ stage, onNext }: { stage: Stage; onNext: () => void }) {
     const timers = [
       setTimeout(() => setPhase(1), 700),
       setTimeout(() => feel.heartbeat(), 1600),
-      setTimeout(() => setPhase(2), 1900),
-      setTimeout(() => setPhase(3), 2900),
+      setTimeout(() => setPhase(3), 2000),
     ];
     return () => {
       timers.forEach(clearTimeout);
@@ -275,15 +274,12 @@ function Arrive({ stage, onNext }: { stage: Stage; onNext: () => void }) {
     >
       <Column gap={22 * k} scroll={false}>
         <Reveal show={phase >= 1} duration={1400}>
-          <Txt variant="display" align="center" style={{ fontSize: 46, lineHeight: 52 }}>Breathe out.</Txt>
-        </Reveal>
-        <Reveal show={phase >= 2} duration={1400}>
-          <Txt variant="body" tone="soft" align="center">Your head wasn't built{'\n'}to hold everything.</Txt>
+          <Txt variant="display" align="center" style={{ fontSize: 44, lineHeight: 50 }}>Breathe out.</Txt>
         </Reveal>
         <View ref={mark} collapsable={false} style={{ width: LIGHT, height: LIGHT, alignSelf: 'center', alignItems: 'center', justifyContent: 'center' }} pointerEvents="none">
           <Animated.View style={[styles.ring, { borderColor: p.inkSoft, width: LIGHT * 0.93, height: LIGHT * 0.93, borderRadius: LIGHT }, ring]} />
         </View>
-        <Reveal show={phase >= 3} duration={1200}>
+        <Reveal show={phase >= 3} duration={900}>
           <Txt variant="whisper" tone="soft" align="center">touch the light</Txt>
         </Reveal>
       </Column>
@@ -347,21 +343,13 @@ function CatchBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
   return (
     <Column gap={(roomy ? 26 : 16) * k}>
       <View>
-        <Reveal delay={200} duration={1100}>
-          <Txt variant="display" align="center">{caught ? 'Caught.' : 'Catch it the moment it appears.'}</Txt>
+        <Reveal delay={200} duration={800}>
+          <Txt variant="display" align="center">{caught ? 'Caught.' : 'What’s on your mind?'}</Txt>
         </Reveal>
-        {roomy && (
-          <Reveal delay={600} duration={1100} style={{ marginTop: 8 }}>
-            <Txt variant="whisper" tone="soft" align="center">
-              {caught ? "It's out of your head now. Feel that?" : "Messy is fine. Type what's circling right now."}
-            </Txt>
-          </Reveal>
-        )}
       </View>
 
       <View ref={mark} collapsable={false} style={[styles.stone, { minHeight: 150 * k }]}>
         <Reveal delay={700} show={!caught}>
-          <Txt variant="whisper" tone="soft" style={{ marginBottom: 8 }}>your first thought</Txt>
           <TextInput
             underlineColorAndroid="transparent"
             ref={input}
@@ -394,7 +382,7 @@ function CatchBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
         {!caught && (
           <Reveal delay={1100}>
             <GlassButton onPress={() => void save(text || 'call dentist thing')} style={styles.pill} radius={26} pearl={1} label="Catch it">
-              <Txt variant="label">{text.trim() ? 'Catch it' : 'Try “call dentist thing”'}</Txt>
+              <Txt variant="label">{text.trim() ? 'Catch it' : 'Try an example'}</Txt>
             </GlassButton>
           </Reveal>
         )}
@@ -410,7 +398,6 @@ function DeskBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
   const k = useTypeScale();
   const { width: W, height: H } = useWindowDimensions();
   const roomy = H > 520;
-  const [trip, setTrip] = useState<number | null | 'looking'>('looking');
   const mark = useMark(stage);
   const slabW = Math.min(300, W - 72);
 
@@ -428,45 +415,31 @@ function DeskBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
       stage.pebble.presence.value = withDelay(500, withTiming(0, { duration: 700 }));
     }, 450);
     const t1 = setTimeout(() => feel.land(0.4), 1500);
-    void ping(guessedServerUrl()).then((ms) => setTrip(ms));
     return () => { clearTimeout(t0); clearTimeout(t1); };
   }, []);
-
-  const status = trip === 'looking' ? 'looking for your desk…' : trip === null ? 'no desk yet · everything waits safely here' : `found your desk · ${trip} ms away`;
 
   return (
     <Column gap={(roomy ? 22 : 14) * k}>
       <View>
-        <Reveal delay={150} duration={1100}>
+        <Reveal delay={150} duration={800}>
           <Txt variant="display" align="center">It waits at your desk.</Txt>
         </Reveal>
-        {roomy && (
-          <Reveal delay={500} duration={1100} style={{ marginTop: 8 }}>
-            <Txt variant="whisper" tone="soft" align="center">One key on your computer opens Shuchu. Everything you caught is already there.</Txt>
-          </Reveal>
-        )}
       </View>
 
       <View style={styles.center}>
         <View ref={mark} collapsable={false} style={[styles.slab, { width: slabW, height: 150 * k }]} pointerEvents="none">
           <Reveal delay={900}>
-            <Txt variant="caps" tone="soft" align="center">AT YOUR DESK</Txt>
             <Txt variant="numeral" align="center" style={{ fontSize: 60, lineHeight: 66 }}>1</Txt>
-            <Txt variant="whisper" tone="soft" align="center">thought waiting</Txt>
+            <Txt variant="whisper" tone="soft" align="center">waiting</Txt>
           </Reveal>
         </View>
         <View style={[styles.deskBase, { width: slabW + 56, backgroundColor: p.inkFaint }]} />
       </View>
 
       <Reveal delay={1200} style={styles.center}>
-        <View style={styles.statusRow}>
-          <View style={[styles.liveDot, { backgroundColor: typeof trip === 'number' ? p.inkSoft : 'transparent', borderColor: p.inkFaint }]} />
-          <Txt variant="whisper" tone="soft" style={{ flexShrink: 1 }}>{status}</Txt>
-        </View>
-        <GlassButton onPress={onNext} style={[styles.pill, { marginTop: 18 * k }]} radius={26} pearl={1} label="Continue">
+        <GlassButton onPress={onNext} style={styles.pill} radius={26} pearl={1} label="Continue">
           <Txt variant="label">Continue</Txt>
         </GlassButton>
-        {roomy && <Txt variant="whisper" tone="faint" align="center" style={{ marginTop: 10 }}>you can link a desk any time in Settings</Txt>}
       </Reveal>
     </Column>
   );
@@ -509,14 +482,9 @@ function EveningBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
         <View ref={mark} collapsable={false} style={{ width: MOON, height: MOON }} />
       </View>
       <View>
-        <Reveal delay={200} duration={1100}>
-          <Txt variant="display" align="center">One quiet question, each evening.</Txt>
+        <Reveal delay={200} duration={800}>
+          <Txt variant="display" align="center">One question,{'\n'}each evening.</Txt>
         </Reveal>
-        {roomy && (
-          <Reveal delay={600} duration={1100} style={{ marginTop: 8 }}>
-            <Txt variant="whisper" tone="soft" align="center">“Anything still in your head?” Nothing else, ever.</Txt>
-          </Reveal>
-        )}
       </View>
 
       <Reveal delay={900} style={styles.center}>
@@ -528,10 +496,10 @@ function EveningBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
           <Dial values={EVENING} index={index} onChange={onDial} label={label} step={22} subdivisions={1} height={100} />
         </View>
         <GlassButton onPress={() => void yes()} style={[styles.pill, { marginTop: 10 * k }]} radius={26} pearl={1} label="Ask me each evening">
-          <Txt variant="label">Ask me at {formatClock(s.eveningHour, s.eveningMinute)}</Txt>
+          <Txt variant="label">Remind me</Txt>
         </GlassButton>
         <Pressable onPress={() => { updateSettings({ eveningOn: false }); onNext(); }} hitSlop={12} accessibilityRole="button" style={{ marginTop: 12 }}>
-          <Txt variant="whisper" tone="soft" align="center">not now</Txt>
+          <Txt variant="label" tone="soft" align="center">Not now</Txt>
         </Pressable>
       </Reveal>
     </Column>
@@ -577,7 +545,7 @@ function ClearBeat({ stage, onDone }: { stage: Stage; onDone: () => void }) {
 
   return (
     <View style={[StyleSheet.absoluteFill, styles.clear]} pointerEvents="none">
-      <Reveal delay={350} duration={1200}>
+      <Reveal delay={350} duration={900}>
         <Txt variant="display" align="center" style={{ fontSize: 52, lineHeight: 58 }}>You're clear.</Txt>
       </Reveal>
     </View>
@@ -597,8 +565,6 @@ const styles = StyleSheet.create({
   pill: { height: 52, paddingHorizontal: 26, minWidth: 190 },
   slab: { justifyContent: 'center' },
   deskBase: { height: StyleSheet.hairlineWidth * 2, borderRadius: 1, marginTop: 10 },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10 },
-  liveDot: { width: 6, height: 6, borderRadius: 3, borderWidth: 1 },
   clockRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
   clear: { justifyContent: 'center', paddingHorizontal: 22 },
 });

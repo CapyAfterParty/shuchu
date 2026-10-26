@@ -8,12 +8,13 @@ import { ESTIMATES } from '../data/guess';
 import { updateTask, useTasks } from '../data/tasks';
 import { feel } from '../feel/feel';
 import { useTheme } from '../theme/theme';
-import { font, type as T } from '../theme/tokens';
+import { font, space, type as T } from '../theme/tokens';
 import { Dial } from '../ui/Dial';
 import { GlassButton } from '../ui/GlassButton';
 import { Icon } from '../ui/Icon';
 import { LiquidChoice } from '../ui/Liquid';
 import { Reveal } from '../ui/motion';
+import { SheetHeader } from '../ui/SheetHeader';
 import { Txt } from '../ui/Txt';
 import { REASONS } from './Inbox';
 
@@ -56,26 +57,17 @@ export function Detail({ id, onClose }: { id: string; onClose: () => void }) {
     onClose();
   }
 
+  const spoken = task.originalText.trim();
+  const sameWords = spoken.toLowerCase() === title.trim().toLowerCase();
+
   return (
     <View style={styles.fill}>
-      <View style={styles.head}>
-        <Reveal delay={80}>
-          <Txt variant="whisper" tone="soft">you said, {said}</Txt>
-        </Reveal>
-        <GlassButton onPress={onClose} style={styles.close} radius={22} label="Close">
-          <Icon name="close" color={p.inkSoft} size={20} />
-        </GlassButton>
-      </View>
+      <SheetHeader onClose={onClose} />
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <Reveal delay={140}>
-          <Txt variant="display" style={styles.quote}>“{task.originalText}”</Txt>
-        </Reveal>
-
-        <Reveal delay={220} style={styles.block}>
-          <Txt variant="caps" tone="soft">WHAT IT IS</Txt>
+        <Reveal delay={120}>
           <TextInput
-              underlineColorAndroid="transparent"
+            underlineColorAndroid="transparent"
             value={title}
             onChangeText={setTitle}
             onEndEditing={saveTitle}
@@ -87,12 +79,16 @@ export function Detail({ id, onClose }: { id: string; onClose: () => void }) {
             returnKeyType="done"
             accessibilityLabel="Title"
           />
-          <View style={[styles.hair, { backgroundColor: p.hair }]} />
+          {/* your own words, kept exactly, only when the title has changed them */}
+          {!sameWords && (
+            <Txt variant="whisper" tone="faint" style={styles.said} accessibilityLabel={`You said ${spoken}, ${said}`}>
+              “{spoken}”
+            </Txt>
+          )}
         </Reveal>
 
-        <Reveal delay={300} style={styles.block}>
-          <View style={styles.reading}>
-            <Txt variant="caps" tone="soft">HOW LONG</Txt>
+        <Reveal delay={180} style={styles.block}>
+          <View style={styles.reading} accessibilityLabel="How long">
             <View style={styles.numberRow}>
               <Txt variant="numeral" style={styles.numeral}>{shown < 60 ? shown : shown / 60}</Txt>
               <Txt variant="title" tone="faint" style={styles.unit}>{shown < 60 ? 'MIN' : shown === 60 ? 'HOUR' : 'HOURS'}</Txt>
@@ -101,8 +97,7 @@ export function Detail({ id, onClose }: { id: string; onClose: () => void }) {
           <Dial values={ESTIMATES} index={estIndex} onChange={onDial} label={dialLabel} step={50} subdivisions={5} />
         </Reveal>
 
-        <Reveal delay={380} style={styles.block}>
-          <Txt variant="caps" tone="soft" style={{ marginBottom: 12 }}>WHERE</Txt>
+        <Reveal delay={240} style={styles.block}>
           <LiquidChoice<Place>
             label="Where it happens"
             value={task.place ?? 'desk'}
@@ -114,8 +109,7 @@ export function Detail({ id, onClose }: { id: string; onClose: () => void }) {
           />
         </Reveal>
 
-        <Reveal delay={460} style={styles.block}>
-          <Txt variant="caps" tone="soft">FIRST TINY STEP</Txt>
+        <Reveal delay={300} style={styles.block}>
           <View style={styles.stepRow}>
             <View style={styles.sparkDot} />
             <TextInput
@@ -124,7 +118,7 @@ export function Detail({ id, onClose }: { id: string; onClose: () => void }) {
               onChangeText={setStep}
               onEndEditing={saveStep}
               onBlur={saveStep}
-              placeholder="the smallest way in"
+              placeholder="First tiny step"
               placeholderTextColor={p.inkFaint}
               style={[styles.step, { color: p.ink }, webNoOutline]}
               selectionColor={p.inkSoft}
@@ -137,10 +131,9 @@ export function Detail({ id, onClose }: { id: string; onClose: () => void }) {
           <View style={[styles.hair, { backgroundColor: p.hair }]} />
         </Reveal>
 
-        <Reveal delay={540} style={styles.actions}>
+        <Reveal delay={360} style={styles.actions}>
           {letting ? (
             <View style={{ flex: 1 }}>
-              <Txt variant="whisper" tone="soft" style={{ marginBottom: 10 }}>Let it go because it's…</Txt>
               <View style={styles.reasonRow}>
                 {REASONS.map((r) => (
                   <GlassButton key={r.key} onPress={() => letGo(r.key)} style={styles.reason} radius={20} label={r.label}>
@@ -184,24 +177,22 @@ export type { Task };
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 26, paddingBottom: 4 },
-  close: { width: 44, height: 44 },
-  scroll: { paddingHorizontal: 26, paddingBottom: 80 },
-  quote: { fontSize: 34, lineHeight: 40, marginTop: 8 },
-  block: { marginTop: 30 },
-  title: { ...T.title, padding: 0, marginTop: 8, marginBottom: 12, textAlignVertical: 'top' },
+  scroll: { paddingHorizontal: space.gutter, paddingBottom: 80 },
+  title: { ...T.display, fontFamily: font.light, fontSize: 30, lineHeight: 36, letterSpacing: -0.6, padding: 0, marginTop: space.s, textAlignVertical: 'top' },
+  said: { marginTop: space.s },
+  block: { marginTop: space.section },
   hair: { height: StyleSheet.hairlineWidth },
-  reading: { marginBottom: -6 },
-  numberRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 },
-  numeral: { fontSize: 76, lineHeight: 84 },
+  reading: { marginBottom: -space.s },
+  numberRow: { flexDirection: 'row', alignItems: 'baseline', gap: space.s },
+  numeral: { fontSize: 72, lineHeight: 78 },
   unit: { fontFamily: font.thin, letterSpacing: 1 },
-  stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginTop: 10, marginBottom: 12 },
-  sparkDot: { width: 7, height: 7, borderRadius: 4, marginTop: 9, backgroundColor: '#FFC9A3', shadowColor: '#FFB27E', shadowOpacity: 0.9, shadowRadius: 6, shadowOffset: { width: 0, height: 0 } },
+  stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space.m, marginBottom: space.l },
+  sparkDot: { width: 7, height: 7, borderRadius: 4, marginTop: 8, backgroundColor: '#FFC9A3', shadowColor: '#FFB27E', shadowOpacity: 0.9, shadowRadius: 6, shadowOffset: { width: 0, height: 0 } },
   step: { ...T.body, flex: 1, padding: 0, textAlignVertical: 'top' },
-  actions: { flexDirection: 'row', gap: 12, marginTop: 34 },
+  actions: { flexDirection: 'row', gap: space.m, marginTop: space.section },
   primary: { flex: 1, height: 54 },
   secondary: { flex: 1, height: 54 },
-  reasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  reason: { height: 42, paddingHorizontal: 14 },
-  reasonInner: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  reasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.s },
+  reason: { height: 40, paddingHorizontal: 14 },
+  reasonInner: { flexDirection: 'row', alignItems: 'center', gap: space.s },
 });

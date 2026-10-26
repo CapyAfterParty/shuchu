@@ -85,16 +85,28 @@ export function Scene() {
     lx /= ll;
     ly /= ll;
 
+    // Pack the live shapes at the front so the shader only walks those;
+    // a screen rarely shows more than a handful of the 32 slots.
     const A: number[][] = [];
     const B: number[][] = [];
     const C: number[][] = [];
     const D: number[][] = [];
+    let upper = 0;
     for (let i = 0; i < SLOTS; i++) {
       const v = slots[i].value;
+      if (v[5] < 0.002) continue;
+      if (v[14] > 0.5) upper++;
       A.push([v[0], v[1], v[2], v[3]]);
       B.push([v[4], v[5], v[6], v[7]]);
       C.push([v[8] || 1, v[9] || 1, v[10], v[11]]);
       D.push([v[12], v[13], v[14], v[15]]);
+    }
+    const count = A.length;
+    for (let i = count; i < SLOTS; i++) {
+      A.push([0, 0, 0, 0]);
+      B.push([0, 0, 0, 0]);
+      C.push([1, 1, 0, 0]);
+      D.push([0, 0, 0, 0]);
     }
     const K: number[][] = [];
     for (let i = 0; i < SPARKS; i++) K.push(sparks[i].value);
@@ -114,6 +126,8 @@ export function Scene() {
       tilt: [t.x, t.y],
       haze: haze.value,
       quality: quality.value,
+      shapeCount: count,
+      upperCount: upper,
       air: mixc(mist.air, night.air),
       b0: mixc(mist.blobs[0], night.blobs[0]),
       b1: mixc(mist.blobs[1], night.blobs[1]),

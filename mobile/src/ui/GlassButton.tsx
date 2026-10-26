@@ -58,8 +58,8 @@ export function GlassButton({
         feel.touch();
         // a ring of light spreads through the mist under your finger
         ripple(e.nativeEvent.pageX, e.nativeEvent.pageY, 0.45);
-        sx.value = withSpring(1.07, spring.touch);
-        sy.value = withSpring(0.9, spring.touch);
+        sx.value = withSpring(1.04, spring.touch);
+        sy.value = withSpring(0.94, spring.touch);
       }}
       onPressOut={() => {
         sx.value = withSpring(1, spring.jelly);

@@ -18,10 +18,11 @@ import { formatMinutes } from '../data/guess';
 import { isOpen, isStale, isWaiting, updateTask, useTasks } from '../data/tasks';
 import { feel } from '../feel/feel';
 import { useTheme } from '../theme/theme';
-import { spring } from '../theme/tokens';
+import { space, spring } from '../theme/tokens';
 import { GlassButton } from '../ui/GlassButton';
 import { Icon } from '../ui/Icon';
 import { Reveal } from '../ui/motion';
+import { SheetHeader } from '../ui/SheetHeader';
 import { Txt } from '../ui/Txt';
 
 const SWIPE = 90; // points of finger travel that commit a swipe
@@ -76,28 +77,17 @@ export function Inbox({ onClose, onOpen }: { onClose: () => void; onOpen: (id: s
   let n = 0;
   return (
     <View style={styles.fill}>
-      <View style={styles.head}>
-        <Reveal delay={60}>
-          <Txt variant="display">Inbox</Txt>
-          <Txt variant="whisper" tone="soft" style={{ marginTop: 2 }}>
-            everything you've caught, in one calm place
-          </Txt>
-        </Reveal>
-        <GlassButton onPress={onClose} style={styles.close} radius={22} label="Close inbox">
-          <Icon name="close" color={p.inkSoft} size={20} />
-        </GlassButton>
-      </View>
+      <SheetHeader title="Inbox" onClose={onClose} closeLabel="Close inbox" />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {empty && (
           <Reveal delay={200} style={styles.empty}>
-            <Txt variant="display" align="center" style={{ fontSize: 34 }}>Nothing here.</Txt>
-            <Txt variant="whisper" tone="soft" align="center" style={{ marginTop: 6 }}>Your head is clear. That's the point.</Txt>
+            <Txt variant="display" align="center" tone="soft">All clear.</Txt>
           </Reveal>
         )}
 
         {groups.stale.length > 0 && (
-          <Section title="From a while ago" hint="still true?">
+          <Section title="Still true?">
             {groups.stale.map((t) => (
               <Reveal key={t.id} delay={120 + n++ * 45}>
                 <StillTrue task={t} onKeep={() => { feel.touch(); void updateTask(t.id, { confirmedAt: new Date().toISOString() }); }} onLetGo={() => letGo(t, 'not_needed')} />
@@ -106,12 +96,12 @@ export function Inbox({ onClose, onOpen }: { onClose: () => void; onOpen: (id: s
           </Section>
         )}
         {groups.desk.length > 0 && (
-          <Section title="At your desk" hint={totalTime(groups.desk)}>
+          <Section title="At your desk" hint={groups.desk.length > 1 ? totalTime(groups.desk) : undefined}>
             {groups.desk.map((t) => row(t, n++))}
           </Section>
         )}
         {groups.errands.length > 0 && (
-          <Section title="Out and about" hint="these stay on your phone">
+          <Section title="Out and about">
             {groups.errands.map((t) => row(t, n++))}
           </Section>
         )}
@@ -123,9 +113,6 @@ export function Inbox({ onClose, onOpen }: { onClose: () => void; onOpen: (id: s
             </View>
           </Reveal>
         )}
-        <Txt variant="whisper" tone="faint" align="center" style={styles.hint}>
-          swipe right to clear · left to let go
-        </Txt>
       </ScrollView>
     </View>
   );
@@ -133,7 +120,7 @@ export function Inbox({ onClose, onOpen }: { onClose: () => void; onOpen: (id: s
 
 function totalTime(tasks: Task[]): string {
   const m = tasks.reduce((a, t) => a + (t.estimateMinutes ?? 0), 0);
-  return m ? `about ${formatMinutes(m)} in all` : '';
+  return m ? formatMinutes(m) : '';
 }
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
@@ -214,8 +201,6 @@ function Row({ task, waiting, onPress, onClear, onLetGo }: {
   const clearHint = useAnimatedStyle(() => ({ opacity: interpolate(raw.value, [10, SWIPE], [0, 1], 'clamp'), transform: [{ scale: interpolate(raw.value, [10, SWIPE, SWIPE + 40], [0.6, 1, 1.15], 'clamp') }] }));
   const goHint = useAnimatedStyle(() => ({ opacity: interpolate(raw.value, [-10, -SWIPE], [0, 1], 'clamp'), transform: [{ scale: interpolate(raw.value, [-10, -SWIPE, -SWIPE - 40], [0.6, 1, 1.15], 'clamp') }] }));
 
-  const sub = task.place === 'errand' ? 'out and about' : task.firstStep ? `first: ${lower(task.firstStep)}` : '';
-
   return (
     <View style={styles.rowWrap}>
       <Animated.View style={[styles.hintLeft, clearHint]}><Icon name="check" color={p.inkSoft} /></Animated.View>
@@ -230,15 +215,11 @@ function Row({ task, waiting, onPress, onClear, onLetGo }: {
             accessibilityRole="button"
             accessibilityHint="Opens the details"
           >
-            <Txt variant="body">{task.cleanTitle ?? task.originalText}</Txt>
-            {sub ? <Txt variant="whisper" tone="soft" numberOfLines={1} style={{ marginTop: 2 }}>{sub}</Txt> : null}
+            <Txt variant="body" numberOfLines={2}>{task.cleanTitle ?? task.originalText}</Txt>
           </Pressable>
           <View style={styles.meta}>
-            <Txt variant="whisper" tone="faint">{task.estimateMinutes ? formatMinutes(task.estimateMinutes) : ''}</Txt>
-            <View style={styles.metaIcons}>
-              {waiting && <View style={[styles.waiting, { borderColor: p.inkFaint }]} />}
-              <Icon name={task.place === 'errand' ? 'errand' : 'desk'} size={16} color={p.inkFaint} />
-            </View>
+            {waiting && <View style={[styles.waiting, { borderColor: p.inkFaint }]} accessibilityLabel="Waiting to reach your desk" />}
+            {task.estimateMinutes ? <Txt variant="whisper" tone="faint">{formatMinutes(task.estimateMinutes)}</Txt> : null}
           </View>
         </Animated.View>
       </GestureDetector>
@@ -247,15 +228,10 @@ function Row({ task, waiting, onPress, onClear, onLetGo }: {
   );
 }
 
-function lower(s: string): string {
-  return s.charAt(0).toLowerCase() + s.slice(1);
-}
-
 function Reasons({ onPick }: { onPick: (r: NotDoingReason) => void }) {
   const p = useTheme();
   return (
     <Reveal rise={6} duration={600} style={styles.reasons}>
-      <Txt variant="whisper" tone="soft" style={{ marginBottom: 10 }}>Let it go because it's…</Txt>
       <View style={styles.reasonRow}>
         {REASONS.map((r) => (
           <GlassButton key={r.key} onPress={() => onPick(r.key)} style={styles.reason} radius={20} lift={0.4} label={r.label}>
@@ -278,7 +254,7 @@ function StillTrue({ task, onKeep, onLetGo }: { task: Task; onKeep: () => void; 
       <View style={styles.row}>
         <View style={styles.rowText}>
           <Txt variant="body">{task.cleanTitle ?? task.originalText}</Txt>
-          <Txt variant="whisper" tone="soft" style={{ marginTop: 2 }}>caught {days} days ago · still true?</Txt>
+          <Txt variant="whisper" tone="faint" style={{ marginTop: space.xs }}>{days} days ago</Txt>
         </View>
         <View style={styles.stillButtons}>
           <GlassButton onPress={onKeep} style={styles.still} radius={16} pearl={0.5} label="Yes, keep it">
@@ -296,27 +272,23 @@ function StillTrue({ task, onKeep, onLetGo }: { task: Task; onKeep: () => void; 
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 26, paddingTop: 4, paddingBottom: 8 },
-  close: { width: 44, height: 44 },
-  scroll: { paddingHorizontal: 26, paddingBottom: 60 },
-  empty: { paddingTop: 120 },
-  section: { marginTop: 26 },
-  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 },
+  scroll: { paddingHorizontal: space.gutter, paddingBottom: 64 },
+  empty: { paddingTop: 140 },
+  section: { marginTop: space.xxl },
+  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: space.xs },
   rowWrap: { position: 'relative' },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15, gap: 14, userSelect: 'none' },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 18, gap: space.l, userSelect: 'none' },
   rowText: { flex: 1, minWidth: 0 },
-  meta: { alignItems: 'flex-end', gap: 5 },
-  metaIcons: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  meta: { flexDirection: 'row', alignItems: 'center', gap: space.s },
   waiting: { width: 6, height: 6, borderRadius: 3, borderWidth: 1 },
   hair: { height: StyleSheet.hairlineWidth },
   hintLeft: { position: 'absolute', left: 0, top: 0, bottom: 0, justifyContent: 'center' },
   hintRight: { position: 'absolute', right: 0, top: 0, bottom: 0, justifyContent: 'center' },
-  reasons: { paddingTop: 6, paddingBottom: 18 },
-  reasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  reason: { height: 42, paddingHorizontal: 14 },
+  reasons: { paddingTop: space.xs, paddingBottom: space.l },
+  reasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.s },
+  reason: { height: 40, paddingHorizontal: 14 },
   reasonInner: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  stillButtons: { flexDirection: 'row', gap: 8 },
+  stillButtons: { flexDirection: 'row', gap: space.s },
   still: { width: 46, height: 34 },
-  cleared: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', marginTop: 30 },
-  hint: { marginTop: 22 },
+  cleared: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', marginTop: space.xxl },
 });

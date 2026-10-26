@@ -16,6 +16,8 @@ import type { Frame } from '../scene/Glass';
 import { claimSpark, releaseSpark, writeSpark } from '../scene/world';
 
 export const melt = Easing.bezier(0.22, 0.61, 0.36, 1);
+/** The house ease-out: quick to answer, long and soft to land (Apple-style). */
+export const glide = Easing.bezier(0.16, 1, 0.3, 1);
 
 /** How revealed the surrounding content is; glass inside grows in with it. */
 export const RevealContext = createContext<SharedValue<number> | null>(null);
@@ -23,17 +25,17 @@ export const useReveal = () => useContext(RevealContext);
 
 /** Content condenses into view: rising a little, fading in, settling. */
 export function Reveal({
-  children, delay = 0, show = true, rise = 10, duration = 900, style,
+  children, delay = 0, show = true, rise = 12, duration = 700, style,
 }: { children: ReactNode; delay?: number; show?: boolean; rise?: number; duration?: number; style?: StyleProp<ViewStyle> }) {
   const p = useSharedValue(0);
   useEffect(() => {
     p.value = show
-      ? withDelay(delay, withTiming(1, { duration, easing: melt }))
-      : withTiming(0, { duration: duration * 0.5, easing: melt });
+      ? withDelay(delay, withTiming(1, { duration, easing: glide }))
+      : withTiming(0, { duration: duration * 0.4, easing: melt });
   }, [show, delay, duration, p]);
   const a = useAnimatedStyle(() => ({
     opacity: p.value,
-    transform: [{ translateY: (1 - p.value) * rise }, { scale: 0.985 + p.value * 0.015 }],
+    transform: [{ translateY: (1 - p.value) * rise }, { scale: 0.98 + p.value * 0.02 }],
   }));
   const parent = useReveal();
   const combined = useDerivedValue(() => p.value * (parent ? parent.value : 1));

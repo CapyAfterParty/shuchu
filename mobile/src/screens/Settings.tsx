@@ -7,12 +7,13 @@ import { ping, useTasks } from '../data/tasks';
 import { askPermission, formatClock, syncEvening } from '../feel/evening';
 import { feel, previewSound } from '../feel/feel';
 import { useTheme } from '../theme/theme';
-import { type as T } from '../theme/tokens';
+import { space, type as T } from '../theme/tokens';
 import { Dial } from '../ui/Dial';
 import { GlassButton } from '../ui/GlassButton';
 import { Icon, type IconName } from '../ui/Icon';
 import { LiquidChoice, LiquidSwitch } from '../ui/Liquid';
 import { Reveal } from '../ui/motion';
+import { SheetHeader } from '../ui/SheetHeader';
 import { Txt } from '../ui/Txt';
 
 /** Evening times: 6:00 PM to 11:45 PM in quarter hours. */
@@ -46,29 +47,17 @@ export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay:
   useEffect(() => { void syncEvening(); }, [s.eveningOn, s.eveningHour, s.eveningMinute]);
   const eveLabel = useCallback((v: number) => (v % 60 === 0 ? `${(v / 60) % 12 || 12}PM` : null), []);
 
-  const linkWords = trip === 'testing'
-    ? 'listening for your desk…'
-    : trip === null
-      ? 'not reachable · thoughts wait safely on your phone'
-      : `linked · ${trip} ms away`;
+  const linkWords = trip === 'testing' ? 'Looking…' : trip === null ? 'Not linked' : `Linked · ${trip} ms`;
 
   let delay = 120;
   const next = () => (delay += 60);
 
   return (
     <View style={styles.fill}>
-      <View style={styles.head}>
-        <Reveal delay={60}>
-          <Txt variant="display">Settings</Txt>
-          <Txt variant="whisper" tone="soft" style={{ marginTop: 2 }}>few choices, all reversible</Txt>
-        </Reveal>
-        <GlassButton onPress={onClose} style={styles.close} radius={22} label="Close settings">
-          <Icon name="close" color={p.inkSoft} size={20} />
-        </GlassButton>
-      </View>
+      <SheetHeader title="Settings" onClose={onClose} closeLabel="Close settings" />
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <Group title="YOUR DESK" delay={next()}>
+        <Group title="DESK" delay={next()}>
           <View style={styles.linkRow}>
             <View style={[styles.liveDot, { backgroundColor: link === 'live' && trip !== null ? p.inkSoft : 'transparent', borderColor: p.inkFaint }]} />
             <Txt variant="body" style={{ flex: 1 }}>{linkWords}</Txt>
@@ -92,13 +81,15 @@ export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay:
               <Txt variant="label" style={{ fontSize: 13 }}>Test</Txt>
             </GlassButton>
           </View>
-          <Txt variant="whisper" tone="faint" style={styles.note}>
-            Leave empty to find the desk on the computer you started Shuchu from.
-          </Txt>
         </Group>
 
-        <Group title="EVENING QUESTION" delay={next()}>
-          <Row icon="moon" title="Anything still in your head?" hint={s.eveningOn ? `asks once, at ${formatClock(s.eveningHour, s.eveningMinute)}` : 'off'}>
+        <Group title="EVENING" delay={next()}>
+          <Row
+            icon="moon"
+            title="Remind me"
+            hint={s.eveningOn ? formatClock(s.eveningHour, s.eveningMinute) : undefined}
+            onHint={() => { feel.touch(); setShowTime(!showTime); }}
+          >
             <LiquidSwitch
               label="Evening question"
               value={s.eveningOn}
@@ -111,9 +102,6 @@ export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay:
           </Row>
           {s.eveningOn && (
             <>
-              <Txt variant="whisper" tone="soft" onPress={() => setShowTime(!showTime)} style={styles.timeToggle}>
-                {showTime ? 'done' : 'change the time'}
-              </Txt>
               {showTime && (
                 <Reveal rise={6} duration={600}>
                   <Txt variant="numeral" align="center" style={styles.clock}>{formatClock(s.eveningHour, s.eveningMinute).replace(' PM', '')}</Txt>
@@ -124,8 +112,7 @@ export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay:
           )}
         </Group>
 
-        <Group title="FEEL" delay={next()}>
-          <Txt variant="whisper" tone="soft" style={{ marginBottom: 10 }}>Haptics</Txt>
+        <Group title="HAPTICS" delay={next()}>
           <LiquidChoice<HapticLevel>
             label="Haptics"
             value={s.haptics}
@@ -136,16 +123,16 @@ export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay:
               { value: 'off', label: 'Off' },
             ]}
           />
-          <View style={{ height: 18 }} />
-          <Row icon="sound" title="Glass sounds" hint={s.sound ? 'a soft tink when you catch' : 'silent, the default'}>
+          <View style={{ height: space.m }} />
+          <Row icon="sound" title="Sounds">
             <LiquidSwitch label="Glass sounds" value={s.sound} onChange={(v) => { updateSettings({ sound: v }); if (v) previewSound(); }} />
           </Row>
-          <Row icon="drop" title="Calm motion" hint="less drifting, no tilt light">
+          <Row icon="drop" title="Calm motion">
             <LiquidSwitch label="Calm motion" value={s.calmMotion} onChange={(v) => updateSettings({ calmMotion: v })} />
           </Row>
         </Group>
 
-        <Group title="LOOK" delay={next()}>
+        <Group title="APPEARANCE" delay={next()}>
           <LiquidChoice<Appearance>
             label="Appearance"
             value={s.appearance}
@@ -158,11 +145,10 @@ export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay:
           />
         </Group>
 
-        <Group title="ABOUT" delay={next()}>
-          <Txt variant="body" tone="soft">Shuchu catches what's in your head so your desk time starts with a plan, not a search.</Txt>
-          <Txt variant="whisper" tone="soft" onPress={onReplay} style={styles.replay}>replay the welcome</Txt>
-          <Txt variant="whisper" tone="faint" style={{ marginTop: 18 }}>Shuchu 1.0 · made to lower your heart rate</Txt>
-        </Group>
+        <Reveal delay={next()} style={styles.footer}>
+          <Txt variant="label" tone="soft" onPress={onReplay} accessibilityRole="button" style={styles.replay}>Replay welcome</Txt>
+          <Txt variant="whisper" tone="faint" style={{ marginTop: space.s }}>Shuchu 1.0</Txt>
+        </Reveal>
       </ScrollView>
     </View>
   );
@@ -177,15 +163,15 @@ function Group({ title, delay, children }: { title: string; delay: number; child
   );
 }
 
-function Row({ icon, title, hint, children }: { icon: IconName; title: string; hint?: string; children: React.ReactNode }) {
+function Row({ icon, title, hint, onHint, children }: { icon: IconName; title: string; hint?: string; onHint?: () => void; children: React.ReactNode }) {
   const p = useTheme();
   return (
     <View style={styles.row}>
       <Icon name={icon} size={20} color={p.inkSoft} />
-      <View style={{ flex: 1 }}>
-        <Txt variant="body">{title}</Txt>
-        {hint ? <Txt variant="whisper" tone="soft" style={{ marginTop: 1 }}>{hint}</Txt> : null}
-      </View>
+      <Txt variant="body" style={{ flex: 1 }}>{title}</Txt>
+      {hint ? (
+        <Txt variant="body" tone="soft" onPress={onHint} accessibilityRole={onHint ? 'button' : undefined} style={styles.hint}>{hint}</Txt>
+      ) : null}
       {children}
     </View>
   );
@@ -193,19 +179,17 @@ function Row({ icon, title, hint, children }: { icon: IconName; title: string; h
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 26, paddingTop: 4, paddingBottom: 8 },
-  close: { width: 44, height: 44 },
-  scroll: { paddingHorizontal: 26, paddingBottom: 80 },
-  group: { marginTop: 30 },
-  groupTitle: { marginBottom: 12 },
-  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  scroll: { paddingHorizontal: space.gutter, paddingBottom: 80 },
+  group: { marginTop: space.xxl },
+  groupTitle: { marginBottom: space.m },
+  linkRow: { flexDirection: 'row', alignItems: 'center', gap: space.m },
   liveDot: { width: 7, height: 7, borderRadius: 4, borderWidth: 1 },
-  addressRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
-  address: { ...T.label, flex: 1, paddingVertical: 8 },
-  test: { height: 36, paddingHorizontal: 16 },
-  note: { marginTop: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 10 },
-  timeToggle: { marginTop: 4, marginLeft: 34, textDecorationLine: 'underline' },
-  clock: { fontSize: 64, lineHeight: 72, marginTop: 10 },
-  replay: { marginTop: 14, textDecorationLine: 'underline' },
+  addressRow: { flexDirection: 'row', alignItems: 'center', gap: space.m, marginTop: space.m },
+  address: { ...T.label, flex: 1, paddingVertical: space.s },
+  test: { height: 36, paddingHorizontal: space.l },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space.l, minHeight: 52 },
+  hint: { paddingHorizontal: space.xs },
+  clock: { fontSize: 60, lineHeight: 68, marginTop: space.s },
+  footer: { marginTop: space.section, alignItems: 'center' },
+  replay: { paddingVertical: space.s },
 });

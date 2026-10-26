@@ -79,9 +79,11 @@ export function Basin({ tasks, origin, arriving, onPress, presence, height = 96 
 
   const desk = tasks.filter((t) => t.place !== 'errand').length;
   const errands = tasks.length - desk;
-  const words = tasks.length === 0
-    ? 'nothing waiting · your head is clear'
-    : [desk && `${desk} at your desk`, errands && `${errands} out and about`].filter(Boolean).join(' · ');
+  // a single quiet count under the pebbles; the details live in the inbox
+  const words = tasks.length === 0 ? '' : `${tasks.length} waiting`;
+  const spoken = tasks.length === 0
+    ? 'Nothing waiting'
+    : [desk && `${desk} at your desk`, errands && `${errands} out and about`].filter(Boolean).join(', ');
 
   // swipe up to open: the pebbles lift under your finger
   const drag = useSharedValue(0);
@@ -116,7 +118,7 @@ export function Basin({ tasks, origin, arriving, onPress, presence, height = 96 
 
   return (
     <GestureDetector gesture={pan}>
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`Open inbox. ${words}`} accessibilityHint="Swipe up or tap" style={{ height }}>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`Open inbox. ${spoken}`} accessibilityHint="Swipe up or tap" style={{ height }}>
       <View ref={ref} collapsable={false} style={styles.row}>
         {layout.map((l, i) => (
           <Pebble
@@ -134,7 +136,7 @@ export function Basin({ tasks, origin, arriving, onPress, presence, height = 96 
         ))}
       </View>
       <Animated.View style={[styles.words, wordsStyle]}>
-        <Txt variant="whisper" tone="soft" align="center">{words}</Txt>
+        <Txt variant="whisper" tone="faint" align="center">{words}</Txt>
       </Animated.View>
     </Pressable>
     </GestureDetector>

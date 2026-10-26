@@ -3,7 +3,7 @@
 // 1. Atmosphere: soft light sources drifting behind frosted air, with a few
 //    out-of-focus glass stones far away. Evaluated analytically, so blurring
 //    it is free (a blurred gaussian is just a wider gaussian).
-// 2. Glass: up to 16 rounded, slightly living shapes, melted together with a
+// 2. Glass: up to 32 rounded, slightly living shapes, melted together with a
 //    smooth union so nearby surfaces flow into each other like liquid.
 //    Inside, the atmosphere is re-sampled through a lens: bent at the rim,
 //    split into red, green and blue, frosted, and lit by a light that moves
@@ -25,6 +25,8 @@ uniform float2 light;      // unit direction towards the light, screen space
 uniform float2 tilt;       // parallax, -1..1
 uniform float haze;        // 0..1 deepens the depth of field behind sheets
 uniform float quality;     // 1 = full, 0 = lighter path for slower phones
+uniform float shapeCount;  // live shapes, packed at the front of the arrays
+uniform float upperCount;  // how many of them rest on sheets (layer 1)
 
 uniform float3 air;
 uniform float3 b0; uniform float3 b1; uniform float3 b2;
@@ -129,6 +131,7 @@ float4 surfaces(float2 p, float layer) {
   float wsum = 0.0;
   float t = time * 0.001;
   for (int i = 0; i < ${SLOTS}; i++) {
+    if (float(i) >= shapeCount) break;
     float4 a = shapeA[i];
     float4 b = shapeB[i];
     if (b.y < 0.002 || abs(shapeD[i].z - layer) > 0.5) continue;
@@ -157,6 +160,7 @@ float4 surfaces(float2 p, float layer) {
 float shadowAt(float2 p, float layer) {
   float lit = 1.0;
   for (int i = 0; i < ${SLOTS}; i++) {
+    if (float(i) >= shapeCount) break;
     float4 a = shapeA[i];
     float4 b = shapeB[i];
     if (b.y < 0.002 || abs(shapeD[i].z - layer) > 0.5) continue;
@@ -257,7 +261,7 @@ half4 main(float2 p) {
 
   // beads and controls resting on the sheets: they cast shadows onto the
   // glass below and look through it, bent by their own lens
-  float4 s = surfaces(p, 1.0);
+  float4 s = upperCount > 0.5 ? surfaces(p, 1.0) : float4(1000.0, 0.0, 0.0, 0.0);
   float d = s.x;
   if (d < 120.0) {
     if (d > -1.5) {

@@ -17,7 +17,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { feel } from '../feel/feel';
 import { Glass } from '../scene/Glass';
 import { useTheme } from '../theme/theme';
-import { RevealContext } from './motion';
+import { melt, RevealContext } from './motion';
 import { spring } from '../theme/tokens';
 
 interface Props {
@@ -45,18 +45,18 @@ export function Sheet({ open, onClose, children, recede = false }: Props) {
     if (open) {
       setMounted(true);
       dy.value = 0;
-      // grows past its size for a moment, like liquid, then settles
-      presence.value = withSpring(1, { damping: 15, stiffness: 150, mass: 1 });
+      // grows a breath past its size, like liquid, then settles without wobbling
+      presence.value = withSpring(1, { damping: 22, stiffness: 190, mass: 1 });
     } else {
-      presence.value = withTiming(0, { duration: 420 });
-      const t = setTimeout(() => setMounted(false), 440);
+      presence.value = withTiming(0, { duration: 340, easing: melt });
+      const t = setTimeout(() => setMounted(false), 360);
       return () => clearTimeout(t);
     }
   }, [open]);
 
   useEffect(() => {
     scale.value = withSpring(recede ? 0.94 : 1, spring.sheet);
-    back.value = withTiming(recede ? 1 : 0, { duration: 420 });
+    back.value = withTiming(recede ? 1 : 0, { duration: 360, easing: melt });
   }, [recede]);
 
   useAnimatedReaction(
@@ -103,6 +103,7 @@ export function Sheet({ open, onClose, children, recede = false }: Props) {
 
   // a sheet that recedes sinks into the mist, so nothing shows through the one on top
   const bodyStyle = useAnimatedStyle(() => ({ opacity: 1 - back.value }));
+  const grabStyle = useAnimatedStyle(() => ({ opacity: 0.5 * (1 - back.value) }));
   // glass inside the sheet grows and sinks with it
   const inner = useDerivedValue(() => presence.value * (1 - back.value));
 
@@ -115,14 +116,14 @@ export function Sheet({ open, onClose, children, recede = false }: Props) {
         radius={46}
         lift={0.9}
         melt={0}
-        wobble={1.2}
+        wobble={0.5}
         presence={presence}
         dy={dy}
         scale={scale}
       >
         <GestureDetector gesture={pan}>
           <View style={styles.grabZone} accessibilityLabel="Pull down to close" onTouchStart={() => feel.touch()}>
-            <View style={[styles.grabber, { backgroundColor: p.inkFaint }]} />
+            <Animated.View style={[styles.grabber, { backgroundColor: p.inkFaint }, grabStyle]} />
           </View>
         </GestureDetector>
         <Animated.View style={[styles.body, { paddingBottom: insets.bottom }, bodyStyle]} pointerEvents={recede ? 'none' : 'auto'}>
@@ -135,7 +136,7 @@ export function Sheet({ open, onClose, children, recede = false }: Props) {
 
 const styles = StyleSheet.create({
   sheet: { flex: 1, marginHorizontal: 8 },
-  grabZone: { height: 30, alignItems: 'center', justifyContent: 'center' },
-  grabber: { width: 38, height: 4, borderRadius: 2, opacity: 0.6 },
+  grabZone: { height: 26, alignItems: 'center', justifyContent: 'center' },
+  grabber: { width: 36, height: 5, borderRadius: 3 },
   body: { flex: 1 },
 });

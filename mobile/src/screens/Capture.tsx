@@ -18,7 +18,7 @@ import { catchThought, isOpen, useTasks } from '../data/tasks';
 import { feel } from '../feel/feel';
 import { Glass, type Frame } from '../scene/Glass';
 import { useTheme, useTypeScale } from '../theme/theme';
-import { font, spring, type as T } from '../theme/tokens';
+import { font, space, spring, type as T } from '../theme/tokens';
 import { GlassButton } from '../ui/GlassButton';
 import { Icon } from '../ui/Icon';
 import { emptyFrame, melt, Reveal, useSpark } from '../ui/motion';
@@ -33,16 +33,7 @@ const PLACEHOLDERS = [
   'fix the invoice thing…',
 ];
 
-/** The stone's whisper follows the day. */
-function promptFor(hour: number): string {
-  if (hour >= 5 && hour < 11) return "what's on your mind this morning?";
-  if (hour >= 17 && hour < 22) return 'anything still in your head?';
-  if (hour >= 22 || hour < 5) return 'put it down, then rest';
-  return 'catch a thought';
-}
-
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 interface Props {
   /** 0..1 how present the capture surface is (sheets absorb it). */
@@ -65,7 +56,6 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
   const tasks = useTasks((s) => s.tasks);
   const link = useTasks((s) => s.link);
   const held = useTasks((s) => s.outbox.length);
-  const lastTrip = useTasks((s) => s.lastTrip);
   const open = useMemo(() => tasks.filter(isOpen), [tasks]);
   const placeholder = useMemo(() => PLACEHOLDERS[Math.floor(Math.random() * PLACEHOLDERS.length)], []);
 
@@ -119,27 +109,19 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
   }));
 
   const now = new Date();
-  const status = link === 'live'
-    ? lastTrip && Date.now() - Date.parse(tasks.find((t) => t.id === lastTrip.id)?.createdAt ?? '0') < 6000
-      ? `on your desk · ${lastTrip.ms} ms`
-      : 'linked to your desk'
-    : link === 'connecting'
-      ? 'finding your desk…'
-      : held > 0
-        ? `${held === 1 ? 'one thought' : `${held} thoughts`} kept safe here`
-        : 'desk not linked yet';
 
   return (
     <Animated.View style={[styles.fill, { paddingTop: insets.top + 8 }, lift]} pointerEvents={active ? 'box-none' : 'none'}>
       <Pressable style={StyleSheet.absoluteFill} onPress={() => Keyboard.dismiss()} accessible={false} />
 
       <Fade presence={presence} style={styles.header}>
-        <View>
-          <Txt variant="display" style={{ fontSize: 30, lineHeight: 34 }}>{DAYS[now.getDay()]}</Txt>
-          <View style={styles.statusRow}>
-            <View style={[styles.dot, { backgroundColor: link === 'live' ? p.inkSoft : 'transparent', borderColor: p.inkFaint }]} />
-            <Txt variant="whisper" tone="soft">{now.getDate()} {MONTHS[now.getMonth()]} · {status}</Txt>
-          </View>
+        <View style={styles.title}>
+          <Txt variant="display">{DAYS[now.getDay()]}</Txt>
+          {/* the one sign of the desk link: a dot that fills when it's live */}
+          <View
+            style={[styles.dot, { backgroundColor: link === 'live' ? p.inkSoft : 'transparent', borderColor: held > 0 || link === 'live' ? p.inkSoft : p.inkFaint }]}
+            accessibilityLabel={link === 'live' ? 'Desk linked' : held > 0 ? `${held} waiting on your phone` : 'Desk not linked'}
+          />
         </View>
         <GlassButton onPress={onOpenSettings} style={styles.tune} radius={23} label="Settings" presence={presence}>
           <Icon name="tune" color={p.inkSoft} />
@@ -159,7 +141,6 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
             presence={presence}
             frame={stone}
           >
-            <Txt variant="whisper" tone="soft" style={styles.label}>{promptFor(now.getHours())}</Txt>
             <TextInput
               underlineColorAndroid="transparent"
               ref={input}
@@ -242,15 +223,14 @@ function Ghost({ text, onDone }: { text: string; onDone: () => void }) {
 
 const styles = StyleSheet.create({
   fill: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 26 },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 4 },
-  dot: { width: 5, height: 5, borderRadius: 3, borderWidth: 1 },
-  tune: { width: 46, height: 46, marginTop: 2 },
-  middle: { flex: 1, justifyContent: 'center', paddingHorizontal: 18 },
-  stone: { minHeight: 188, paddingHorizontal: 28, paddingTop: 26, paddingBottom: 40 },
-  label: { marginBottom: 10 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: space.gutter, paddingTop: space.s },
+  title: { flexDirection: 'row', alignItems: 'center', gap: space.m },
+  dot: { width: 7, height: 7, borderRadius: 4, borderWidth: 1, marginTop: 6 },
+  tune: { width: 44, height: 44 },
+  middle: { flex: 1, justifyContent: 'center', paddingHorizontal: space.l },
+  stone: { minHeight: 176, paddingHorizontal: space.xl + 4, paddingTop: space.xl + 4, paddingBottom: space.section },
   input: { ...T.thought, fontFamily: font.thin, padding: 0, minHeight: 80, textAlignVertical: 'top' },
-  ghost: { position: 'absolute', left: 0, right: 0, top: 29 },
+  ghost: { position: 'absolute', left: 0, right: 0, top: 0 },
   beadSpot: { position: 'absolute', right: 26, bottom: -26 },
   bead: { width: 66, height: 60 },
 });

@@ -92,28 +92,40 @@ export const font = {
 } as const;
 
 export const type = {
-  numeral: { fontFamily: font.thin, fontSize: 88, letterSpacing: -4, lineHeight: 92 },
-  display: { fontFamily: font.serifItalic, fontSize: 40, lineHeight: 44, letterSpacing: -0.6 },
-  title: { fontFamily: font.light, fontSize: 26, lineHeight: 32, letterSpacing: -0.4 },
-  thought: { fontFamily: font.thin, fontSize: 30, lineHeight: 37, letterSpacing: -0.5 },
-  body: { fontFamily: font.light, fontSize: 18, lineHeight: 25, letterSpacing: -0.1 },
-  label: { fontFamily: font.regular, fontSize: 15, lineHeight: 20, letterSpacing: 0 },
-  whisper: { fontFamily: font.lightItalic, fontSize: 14, lineHeight: 19, letterSpacing: 0.15 },
-  caps: { fontFamily: font.regular, fontSize: 11, lineHeight: 14, letterSpacing: 1.6 },
+  numeral: { fontFamily: font.thin, fontSize: 80, letterSpacing: -3.5, lineHeight: 86 },
+  display: { fontFamily: font.serifItalic, fontSize: 36, lineHeight: 40, letterSpacing: -0.5 },
+  title: { fontFamily: font.light, fontSize: 22, lineHeight: 28, letterSpacing: -0.3 },
+  thought: { fontFamily: font.thin, fontSize: 28, lineHeight: 35, letterSpacing: -0.4 },
+  body: { fontFamily: font.light, fontSize: 17, lineHeight: 23, letterSpacing: -0.1 },
+  label: { fontFamily: font.regular, fontSize: 16, lineHeight: 20, letterSpacing: 0 },
+  whisper: { fontFamily: font.lightItalic, fontSize: 14, lineHeight: 19, letterSpacing: 0.1 },
+  caps: { fontFamily: font.medium, fontSize: 11, lineHeight: 14, letterSpacing: 1.4 },
 } as const;
 
-/** Motion: nothing snaps. Springs are tuned to feel heavy, wet and calm. */
+/** Space: one 4-point grid. Screens breathe at `gutter`, sections at `section`. */
+export const space = {
+  xs: 4,
+  s: 8,
+  m: 12,
+  l: 16,
+  xl: 24,
+  xxl: 32,
+  section: 40,
+  gutter: 24,
+} as const;
+
+/** Motion: nothing snaps, nothing wobbles for long. Critically damped by default. */
 export const spring = {
   /** Glass settling into place. */
-  settle: { damping: 22, stiffness: 140, mass: 1.1 },
-  /** Liquid wobble after a touch. */
-  jelly: { damping: 9, stiffness: 260, mass: 0.7 },
+  settle: { damping: 24, stiffness: 160, mass: 1 },
+  /** A single soft wobble after a touch. */
+  jelly: { damping: 12, stiffness: 300, mass: 0.7 },
   /** Quick but soft response to a finger. */
-  touch: { damping: 18, stiffness: 420, mass: 0.6 },
+  touch: { damping: 20, stiffness: 420, mass: 0.6 },
   /** Big surfaces, sheets and screens. */
-  sheet: { damping: 26, stiffness: 180, mass: 1.2 },
+  sheet: { damping: 28, stiffness: 220, mass: 1 },
   /** Falling pebbles. */
-  drop: { damping: 11, stiffness: 120, mass: 1 },
+  drop: { damping: 13, stiffness: 140, mass: 1 },
 } as const;
 
-export const duration = { whisper: 900, melt: 1100, breath: 5200 } as const;
+export const duration = { whisper: 600, melt: 800, breath: 5200 } as const;
