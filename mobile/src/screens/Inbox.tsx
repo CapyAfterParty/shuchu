@@ -98,7 +98,7 @@ export function Inbox({ onClose, onOpen }: { onClose: () => void; onOpen: (id: s
               </Glass>
               <Bubble said={said} side="center" style={styles.napBubble} />
             </Pressable>
-            <Txt variant="display" align="center" tone="soft">All clear.</Txt>
+            <Txt variant="display" align="center" tone="soft" style={{ alignSelf: "stretch" }}>All clear.</Txt>
           </Reveal>
         )}
 

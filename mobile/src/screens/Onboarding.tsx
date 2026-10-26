@@ -472,7 +472,7 @@ function CatchBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
         <Glass style={[styles.stone, { minHeight: 150 * k }]} contentStyle={styles.middle} radius={44 * k} lift={0.6} wobble={1.8} melt={30} frame={stoneF}>
         <Reveal delay={700} show={!caught}>
           <TextInput
-              maxFontSizeMultiplier={1.15}
+              allowFontScaling={false}
             underlineColorAndroid="transparent"
             ref={input}
             value={text}

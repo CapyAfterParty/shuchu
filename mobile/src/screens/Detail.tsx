@@ -75,7 +75,7 @@ export function Detail({ id, onClose }: { id: string; onClose: () => void }) {
       <ScrollArea contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <Reveal delay={120}>
           <TextInput
-              maxFontSizeMultiplier={1.15}
+              allowFontScaling={false}
             underlineColorAndroid="transparent"
             value={title}
             onChangeText={setTitle}
@@ -122,7 +122,7 @@ export function Detail({ id, onClose }: { id: string; onClose: () => void }) {
           <View style={styles.stepRow}>
             <View style={styles.sparkDot} />
             <TextInput
-              maxFontSizeMultiplier={1.15}
+              allowFontScaling={false}
               underlineColorAndroid="transparent"
               value={step}
               onChangeText={setStep}

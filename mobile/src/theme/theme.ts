@@ -32,3 +32,13 @@ export function useTypeScale(): number {
   const { width, height } = useWindowDimensions();
   return Math.max(0.7, Math.min(1, width / 390, height / 780));
 }
+
+/**
+ * The phone's text size setting, honoured up to 1.15x. Text is sized with
+ * this directly (and the system scaling turned off), so the size Android
+ * measures and the size it draws are always the same.
+ */
+export function useFontScale(): number {
+  const { fontScale } = useWindowDimensions();
+  return Math.min(Math.max(fontScale || 1, 0.85), 1.15);
+}

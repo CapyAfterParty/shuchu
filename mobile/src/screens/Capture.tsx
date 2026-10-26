@@ -176,7 +176,7 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
             frame={stone}
           >
             <TextInput
-              maxFontSizeMultiplier={1.15}
+              allowFontScaling={false}
               underlineColorAndroid="transparent"
               ref={input}
               value={text}
@@ -257,7 +257,7 @@ function Ghost({ text, onDone }: { text: string; onDone: () => void }) {
   const k = useTypeScale();
   return (
     <View style={styles.ghostWrap} pointerEvents="none">
-      <Animated.Text numberOfLines={3} maxFontSizeMultiplier={1.15} style={[styles.input, styles.ghost, { color: p.ink, fontSize: T.thought.fontSize * k, lineHeight: T.thought.lineHeight * k }, a]}>
+      <Animated.Text numberOfLines={3} allowFontScaling={false} style={[styles.input, styles.ghost, { color: p.ink, fontSize: T.thought.fontSize * k, lineHeight: T.thought.lineHeight * k }, a]}>
         {text}
       </Animated.Text>
     </View>
