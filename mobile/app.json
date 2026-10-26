@@ -83,7 +83,8 @@
             "usesCleartextTraffic": true
           }
         }
-      ]
+      ],
+      "./plugins/withLeanGradle"
     ],
     "runtimeVersion": {
       "policy": "appVersion"
