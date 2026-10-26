@@ -21,6 +21,7 @@ import { stoneFrame } from '../scene/world';
 import { useTheme, useTypeScale } from '../theme/theme';
 import { font, space, spring, type as T } from '../theme/tokens';
 import { GlassButton } from '../ui/GlassButton';
+import { Eyes, type Mood } from '../ui/Eyes';
 import { Icon } from '../ui/Icon';
 import { emptyFrame, melt, Reveal, useSpark } from '../ui/motion';
 import { Txt } from '../ui/Txt';
@@ -68,6 +69,11 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
   const sparkGlow = useSharedValue(0.3);
 
   const hasText = text.trim().length > 0;
+  const [joy, setJoy] = useState(false);
+  const joyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(joyTimer.current), []);
+  const hour = new Date().getHours();
+  const shuMood: Mood = joy ? 'happy' : !hasText && (hour >= 23 || hour < 5) ? 'sleepy' : 'awake';
   useEffect(() => {
     ready.value = withTiming(hasText ? 1 : 0, { duration: 500, easing: melt });
   }, [hasText, ready]);
@@ -78,7 +84,8 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
   }, [sparkGlow]);
   const sparkI = useSharedValue(0);
   const beadGlow = useDerivedValue(() => (0.3 + ready.value * 0.7) * sparkGlow.value * presence.value + sparkI.value);
-  useSpark(bead, beadGlow, 5.5);
+  // the bead's light is a glint on its rim, never in the middle of Shu's face
+  useSpark(bead, beadGlow, 5, { x: 0.8, y: 0.8 });
 
   useEffect(() => {
     if (active) {
@@ -101,6 +108,9 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
     sy.value = withSequence(withTiming(0.955, { duration: 110 }), withSpring(1, spring.jelly));
     sx.value = withSequence(withTiming(1.03, { duration: 110 }), withSpring(1, spring.jelly));
     sparkI.value = withSequence(withTiming(2.4, { duration: 120 }), withTiming(0, { duration: 900, easing: melt }));
+    setJoy(true);
+    clearTimeout(joyTimer.current);
+    joyTimer.current = setTimeout(() => setJoy(false), 1600);
     const task = await catchThought(words);
     setArriving(task.id);
   }
@@ -133,6 +143,7 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
         <View>
           <Glass
             style={styles.stone}
+            contentStyle={styles.stoneInner}
             radius={52}
             wobble={2.2}
             melt={32}
@@ -170,7 +181,7 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
               selectionColor={p.inkSoft}
               cursorColor={p.inkSoft}
               keyboardAppearance={p.name === 'night' ? 'dark' : 'light'}
-              style={[styles.input, { color: p.ink, fontSize: T.thought.fontSize * k, lineHeight: T.thought.lineHeight * k, minHeight: 80 * k }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
+              style={[styles.input, { color: p.ink, fontSize: T.thought.fontSize * k, lineHeight: T.thought.lineHeight * k, minHeight: T.thought.lineHeight * k }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
               accessibilityLabel="Catch a thought"
             />
             {ghost && <Ghost key={ghost.key} text={ghost.text} onDone={() => setGhost(null)} />}
@@ -186,7 +197,10 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
               frame={bead}
               label="Save thought"
               presence={presence}
-            />
+            >
+              {/* Shu lives in the save bead: watches your words, smiles when they're caught, dozes late at night */}
+              <Eyes size={62} mood={shuMood} watch={hasText ? { x: -0.9, y: -0.55 } : null} />
+            </GlassButton>
           </View>
         </View>
       </View>
@@ -217,9 +231,11 @@ function Ghost({ text, onDone }: { text: string; onDone: () => void }) {
   const p = useTheme();
   const k = useTypeScale();
   return (
-    <Animated.Text numberOfLines={3} maxFontSizeMultiplier={1.15} style={[styles.input, styles.ghost, { color: p.ink, fontSize: T.thought.fontSize * k, lineHeight: T.thought.lineHeight * k }, a]} pointerEvents="none">
-      {text}
-    </Animated.Text>
+    <View style={styles.ghostWrap} pointerEvents="none">
+      <Animated.Text numberOfLines={3} maxFontSizeMultiplier={1.15} style={[styles.input, styles.ghost, { color: p.ink, fontSize: T.thought.fontSize * k, lineHeight: T.thought.lineHeight * k }, a]}>
+        {text}
+      </Animated.Text>
+    </View>
   );
 }
 
@@ -230,9 +246,12 @@ const styles = StyleSheet.create({
   dot: { width: 7, height: 7, borderRadius: 4, borderWidth: 1, marginTop: 6 },
   tune: { width: 44, height: 44 },
   middle: { flex: 1, justifyContent: 'center', paddingHorizontal: space.l },
-  stone: { minHeight: 176, paddingHorizontal: space.xl + 4, paddingTop: space.xl + 4, paddingBottom: space.section },
-  input: { ...T.thought, fontFamily: font.thin, padding: 0, minHeight: 80, textAlignVertical: 'top' },
-  ghost: { position: 'absolute', left: 0, right: 0, top: 0 },
+  stone: { minHeight: 176, paddingHorizontal: space.xl + 4, paddingVertical: space.xl + 4 },
+  // the caret waits in the middle of the stone, and words grow out from there
+  stoneInner: { justifyContent: 'center' },
+  input: { ...T.thought, fontFamily: font.thin, padding: 0, textAlign: 'center', textAlignVertical: 'center' },
+  ghostWrap: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center' },
+  ghost: {},
   beadSpot: { position: 'absolute', right: 26, bottom: -26 },
   bead: { width: 66, height: 60 },
 });

@@ -271,8 +271,11 @@ half4 main(float2 pos) {
   // the world below is in screen points
   float2 p = pos / viewScale;
   if (glassOn < 0.5) {
-    // sparks are drawn natively above the porcelain surfaces
-    float3 air0 = atmosphere(rippled(p), 0.0);
+    // sparks are drawn natively above the porcelain surfaces. The room is
+    // quiet: mostly the plain air colour, the drifting light only a whisper
+    float3 air0 = mix(air, atmosphere(rippled(p), 0.0), 0.3);
+    float2 vg = (p / res - 0.5) * float2(0.9, 1.1);
+    air0 *= 1.0 - dot(vg, vg) * (0.05 + night * 0.12);
     float g0 = grainNoise(floor(pos) + floor(time * 0.024) * float2(37.0, 17.0)) - 0.5;
     return half4(air0 + g0 * (0.006 + night * 0.005), 1.0);
   }

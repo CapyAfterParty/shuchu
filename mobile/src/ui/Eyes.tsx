@@ -9,7 +9,7 @@
 // Eyes can sit inside any view (they fill it), or follow a free glass shape
 // via `follow` (centre and half size), for the heroes that morph.
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   type SharedValue,
@@ -29,7 +29,7 @@ interface Follow {
   presence: SharedValue<number>;
 }
 
-export function Eyes({ size = 64, mood = 'awake', follow, show, gaze }: {
+export function Eyes({ size = 64, mood = 'awake', follow, show, gaze, watch = null }: {
   /** Width of the body the eyes sit in (when not following a shape). */
   size?: number;
   mood?: Mood;
@@ -38,10 +38,17 @@ export function Eyes({ size = 64, mood = 'awake', follow, show, gaze }: {
   show?: SharedValue<number>;
   /** Where to look, -1..1 on each axis. */
   gaze?: SharedValue<{ x: number; y: number }>;
+  /** Something to keep looking at (e.g. the words you are typing); null to look about freely. */
+  watch?: { x: number; y: number } | null;
 }) {
   const p = useTheme();
   const lid = useSharedValue(1); // 1 open, 0 shut
   const look = useSharedValue({ x: 0, y: 0 });
+  const watching = useRef(watch);
+  useEffect(() => {
+    watching.current = watch;
+    look.value = withTiming(watch ?? { x: 0, y: 0 }, { duration: watch ? 240 : 420 });
+  }, [watch?.x, watch?.y]);
 
   // Blinks come at 2.5 to 6 s, now and then a double blink. Glances are rarer.
   useEffect(() => {
@@ -53,7 +60,7 @@ export function Eyes({ size = 64, mood = 'awake', follow, show, gaze }: {
       lid.value = twice
         ? withSequence(withTiming(0, { duration: 70 }), withTiming(1, { duration: 110 }), withDelay(90, withTiming(0, { duration: 70 })), withTiming(1, { duration: 130 }))
         : withSequence(withTiming(0, { duration: 80 }), withTiming(1, { duration: 140 }));
-      if (!gaze && Math.random() < 0.4) {
+      if (!gaze && !watching.current && Math.random() < 0.4) {
         const x = (Math.random() - 0.5) * 1.4;
         const y = (Math.random() - 0.5) * 0.8;
         look.value = withTiming({ x, y }, { duration: 260 });

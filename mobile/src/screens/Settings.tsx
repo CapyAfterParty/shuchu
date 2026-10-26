@@ -14,6 +14,8 @@ import { Icon, type IconName } from '../ui/Icon';
 import { LiquidChoice, LiquidSwitch } from '../ui/Liquid';
 import { Reveal } from '../ui/motion';
 import { SheetHeader } from '../ui/SheetHeader';
+import { Glass } from '../scene/Glass';
+import { Eyes } from '../ui/Eyes';
 import { ScrollArea } from '../ui/ScrollArea';
 import { Txt } from '../ui/Txt';
 
@@ -173,6 +175,10 @@ export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay:
         </Group>
 
         <Reveal delay={next()} style={styles.footer}>
+          {/* Shu keeps you company down here */}
+          <Glass style={styles.shu} radius={26} lift={0.6} wobble={1.4} pearl={0.2}>
+            <Eyes size={54} mood={s.calmMotion ? 'sleepy' : 'awake'} />
+          </Glass>
           <Txt variant="label" tone="soft" onPress={onReplay} accessibilityRole="button" style={styles.replay}>Replay welcome</Txt>
           <Txt variant="whisper" tone="faint">Shuchu 1.0</Txt>
         </Reveal>
@@ -222,5 +228,6 @@ const styles = StyleSheet.create({
   address: { ...T.label, flex: 1, paddingVertical: space.m },
   dial: { paddingBottom: space.m },
   footer: { marginTop: space.section, alignItems: 'center', gap: space.xs },
+  shu: { width: 56, height: 52, marginBottom: space.m },
   replay: { paddingVertical: space.s },
 });

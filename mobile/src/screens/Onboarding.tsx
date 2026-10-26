@@ -29,7 +29,7 @@ import { updateSettings, useSettings } from '../data/settings';
 import { catchThought } from '../data/tasks';
 import { askPermission, formatClock } from '../feel/evening';
 import { feel } from '../feel/feel';
-import type { Frame } from '../scene/Glass';
+import { Glass, type Frame } from '../scene/Glass';
 import { type FreeShape, useShape } from '../scene/useShape';
 import { claimSpark, releaseSpark, ripple, writeSpark } from '../scene/world';
 import { useTheme, useTypeScale } from '../theme/theme';
@@ -38,7 +38,7 @@ import { Dial } from '../ui/Dial';
 import { GlassButton } from '../ui/GlassButton';
 import { glide, melt, Reveal, RevealContext } from '../ui/motion';
 import { placeOnScreen, ScrollArea, useScrollTrack } from '../ui/ScrollArea';
-import { Eyes } from '../ui/Eyes';
+import { Eyes, type Mood } from '../ui/Eyes';
 import { Headline } from '../ui/Headline';
 import { Txt } from '../ui/Txt';
 import { EVENING } from './Settings';
@@ -57,6 +57,8 @@ interface Stage {
   spark: { i: SharedValue<number>; r: SharedValue<number>; boost: SharedValue<number>; x: SharedValue<number>; y: SharedValue<number> };
   /** Dew: small drops around the hero that gather into it, fly off it and fall back. */
   drops: { show: SharedValue<number>; gather: SharedValue<number>; burst: SharedValue<number>; splash: SharedValue<number> };
+  /** Shu: the hero drop's face, which travels with it through every beat. */
+  shu: { show: SharedValue<number>; setMood: (m: Mood) => void; setWatch: (w: { x: number; y: number } | null) => void };
 }
 
 const DROPS = 7;
@@ -154,10 +156,14 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
     breath.value = withRepeat(withSequence(withTiming(1.12, { duration: 2400 }), withTiming(0.9, { duration: 2400 })), -1, true);
   }, []);
 
+  const [shuMood, setShuMood] = useState<Mood>('awake');
+  const [shuWatch, setShuWatch] = useState<{ x: number; y: number } | null>(null);
+  const shuShow = useSharedValue(0);
   const stage: Stage = {
     target, radius, anchor, hero, pebble,
     spark: { i: sparkI, r: sparkR, boost: sparkBoost, x: sparkX, y: sparkY },
     drops: { show: dropShow, gather: dropGather, burst: dropBurst, splash: dropSplash },
+    shu: { show: shuShow, setMood: setShuMood, setWatch: setShuWatch },
   };
 
   // Between beats the words breathe out first, then the next beat condenses
@@ -193,6 +199,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           {beat === 'clear' && <ClearBeat stage={stage} onDone={onDone} />}
         </Animated.View>
       </RevealContext.Provider>
+      <Eyes follow={hero} show={shuShow} mood={shuMood} watch={shuWatch} />
       {step > 0 && step < 4 && <TopBar step={step} onSkip={() => go('clear')} />}
     </View>
   );
@@ -297,6 +304,7 @@ function Arrive({ stage, onNext }: { stage: Stage; onNext: () => void }) {
     if (done.value === 1) return;
     const h = hold.value;
     stage.drops.gather.value = h;
+    stage.shu.show.value = Math.max(0, Math.min(1, (h - 0.8) / 0.2));
     stage.hero.presence.value = Math.min(1, h * 2.2);
     stage.hero.warm.value = 0.5 * h;
     stage.spark.boost.value = h * 0.9;
@@ -305,7 +313,6 @@ function Arrive({ stage, onNext }: { stage: Stage; onNext: () => void }) {
 
   // The drop is someone: once it has formed it opens its eyes, the light
   // slides to a glint on its rim, and it gives a little hop before the next beat.
-  const eyesOpen = useDerivedValue(() => Math.max(0, Math.min(1, (hold.value - 0.8) / 0.2)));
   const wake = () => {
     stage.anchor.value = { x: 0.76, y: 0.74 };
     stage.hero.sy.value = withSequence(withTiming(0.88, { duration: 120 }), withSpring(1, spring.jelly));
@@ -372,7 +379,6 @@ function Arrive({ stage, onNext }: { stage: Stage; onNext: () => void }) {
       accessibilityActions={[{ name: 'activate' }]}
       onAccessibilityAction={begin}
     >
-      <Eyes follow={stage.hero} show={eyesOpen} />
       <Column gap={22 * k} scroll={false}>
         <Headline text="Breathe out." delay={700} stagger={160} style={{ fontSize: 44, lineHeight: 52 }} />
         <View ref={mark} collapsable={false} style={{ width: LIGHT, height: LIGHT, alignSelf: 'center', alignItems: 'center', justifyContent: 'center' }} pointerEvents="none">
@@ -397,20 +403,33 @@ function CatchBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
   const [text, setText] = useState('');
   const [caught, setCaught] = useState(false);
   const advance = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const mark = useMark(stage);
+  const [intro, setIntro] = useState(true);
+  const stoneF = useSharedValue<Frame>({ x: 0, y: 0, w: 0, h: 0 });
+  // Shu hops onto the stone's top corner and melts into it, like a drop resting there
+  const SHU = 60 * k;
+  const mark = useMark(stage, (f) => {
+    'worklet';
+    return { x: f.x + f.w - SHU * 0.95, y: f.y - SHU * 0.5, w: SHU, h: SHU * 0.94 };
+  });
 
   useEffect(() => {
-    stage.radius.value = 48 * k;
-    stage.anchor.value = { x: 0.88, y: 0.8 };
+    stage.radius.value = -1;
+    stage.anchor.value = { x: 0.8, y: 0.8 };
+    stage.shu.show.value = withTiming(1, { duration: 300 });
+    stage.shu.setMood('awake');
+    stage.shu.setWatch(null);
     stage.hero.presence.value = withTiming(1, { duration: 400 });
     stage.hero.warm.value = withTiming(0, { duration: 900 });
     stage.hero.pearl.value = withTiming(0, { duration: 600 });
     stage.spark.i.value = withTiming(0.7, { duration: 900 });
     stage.spark.r.value = withTiming(5, { duration: 900 });
     const t = setTimeout(() => input.current?.focus(), 900);
+    const hi = setTimeout(() => setIntro(false), 1900);
     return () => {
       clearTimeout(t);
+      clearTimeout(hi);
       clearTimeout(advance.current);
+      stage.shu.setWatch(null);
     };
   }, []);
 
@@ -422,11 +441,15 @@ function CatchBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
     input.current?.blur();
     feel.catch();
     const { hero, pebble, spark } = stage;
-    hero.sy.value = withSequence(withTiming(0.95, { duration: 110 }), withSpring(1, spring.jelly));
-    hero.sx.value = withSequence(withTiming(1.03, { duration: 110 }), withSpring(1, spring.jelly));
+    // Shu is delighted: eyes close happily, a hop, and back
+    stage.shu.setWatch(null);
+    stage.shu.setMood('happy');
+    setTimeout(() => stage.shu.setMood('awake'), 1500);
+    hero.sy.value = withSequence(withTiming(0.82, { duration: 110 }), withSpring(1, spring.jelly));
+    hero.sx.value = withSequence(withTiming(1.12, { duration: 110 }), withSpring(1, spring.jelly));
     spark.i.value = withSequence(withTiming(2.6, { duration: 120 }), withTiming(0.7, { duration: 900 }));
-    // a drop pinches off the stone and falls below it
-    const s = stage.target.value;
+    // the thought pinches off the stone as a drop and falls below it
+    const s = stoneF.value;
     const land = s.y + s.h + Math.min(110, (H - (s.y + s.h)) * 0.5);
     pebble.cx.value = s.x + s.w / 2;
     pebble.cy.value = s.y + s.h * 0.6;
@@ -442,17 +465,22 @@ function CatchBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
   return (
     <Column gap={(roomy ? 26 : 16) * k}>
       <View>
-        <Headline text={caught ? 'Caught.' : 'What’s on your mind?'} delay={caught ? 120 : 220} />
+        <Headline text={caught ? 'Caught.' : intro ? 'Hi, I’m Shu.' : 'What’s on your mind?'} delay={caught || !intro ? 80 : 260} />
       </View>
 
-      <View ref={mark} collapsable={false} style={[styles.stone, { minHeight: 150 * k }]}>
+      <View ref={mark} collapsable={false}>
+        <Glass style={[styles.stone, { minHeight: 150 * k }]} contentStyle={styles.middle} radius={44 * k} lift={0.6} wobble={1.8} melt={30} frame={stoneF}>
         <Reveal delay={700} show={!caught}>
           <TextInput
               maxFontSizeMultiplier={1.15}
             underlineColorAndroid="transparent"
             ref={input}
             value={text}
-            onChangeText={setText}
+            onChangeText={(t) => {
+              setText(t);
+              // Shu watches the words as they come
+              stage.shu.setWatch(t.trim() ? { x: -0.7, y: 0.8 } : null);
+            }}
             placeholder="call dentist thing…"
             placeholderTextColor={p.inkFaint}
             multiline
@@ -468,12 +496,13 @@ function CatchBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
               }
             }}
             keyboardAppearance={p.name === 'night' ? 'dark' : 'light'}
-            style={[styles.thought, { color: p.ink, fontSize: T.thought.fontSize * k, lineHeight: T.thought.lineHeight * k, minHeight: 70 * k },
+            style={[styles.thought, { color: p.ink, fontSize: T.thought.fontSize * k, lineHeight: T.thought.lineHeight * k, minHeight: T.thought.lineHeight * k },
               Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
             selectionColor={p.inkSoft}
             accessibilityLabel="Your first thought"
           />
         </Reveal>
+        </Glass>
       </View>
 
       <View style={styles.center}>
@@ -496,24 +525,33 @@ function DeskBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
   const k = useTypeScale();
   const { width: W, height: H } = useWindowDimensions();
   const roomy = H > 520;
-  const mark = useMark(stage);
   const slabW = Math.min(300, W - 72);
+  const slabF = useSharedValue<Frame>({ x: 0, y: 0, w: 0, h: 0 });
+  // Shu perches on top of the desk, looking down at what's waiting
+  const SHU = 54 * k;
+  const mark = useMark(stage, (f) => {
+    'worklet';
+    return { x: f.x + f.w - SHU - 20, y: f.y - SHU * 0.62, w: SHU, h: SHU * 0.94 };
+  });
 
   useEffect(() => {
-    stage.radius.value = 22;
-    stage.anchor.value = { x: 0.9, y: 0.82 };
+    stage.radius.value = -1;
+    stage.anchor.value = { x: 0.8, y: 0.8 };
+    stage.shu.setMood('awake');
+    stage.shu.setWatch({ x: -0.6, y: 1 });
+    stage.shu.show.value = withTiming(1, { duration: 300 });
     stage.hero.pearl.value = withTiming(0.1, { duration: 800 });
     stage.spark.i.value = withTiming(0.5, { duration: 600 });
     // the pebble rises into the desk and is absorbed by it
     const t0 = setTimeout(() => {
-      const s = stage.target.value;
+      const s = slabF.value;
       stage.pebble.melt.value = 44;
       stage.pebble.cx.value = withSpring(s.x + s.w / 2, spring.sheet);
       stage.pebble.cy.value = withSpring(s.y + s.h / 2, spring.sheet);
       stage.pebble.presence.value = withDelay(500, withTiming(0, { duration: 700 }));
     }, 450);
     const t1 = setTimeout(() => feel.land(0.4), 1500);
-    return () => { clearTimeout(t0); clearTimeout(t1); };
+    return () => { clearTimeout(t0); clearTimeout(t1); stage.shu.setWatch(null); };
   }, []);
 
   return (
@@ -523,11 +561,13 @@ function DeskBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
       </View>
 
       <View style={styles.center}>
-        <View ref={mark} collapsable={false} style={[styles.slab, { width: slabW, height: 150 * k }]} pointerEvents="none">
-          <Reveal delay={900}>
-            <Txt variant="numeral" align="center" style={{ fontSize: 60, lineHeight: 66 }}>1</Txt>
-            <Txt variant="whisper" tone="soft" align="center">waiting</Txt>
-          </Reveal>
+        <View ref={mark} collapsable={false} style={{ marginTop: 30 * k }} pointerEvents="none">
+          <Glass style={{ width: slabW, height: 150 * k }} contentStyle={styles.middle} radius={26} lift={0.5} wobble={0.8} melt={30} pearl={0.1} frame={slabF}>
+            <Reveal delay={900}>
+              <Txt variant="numeral" align="center" style={{ fontSize: 60, lineHeight: 66 }}>1</Txt>
+              <Txt variant="whisper" tone="soft" align="center">waiting</Txt>
+            </Reveal>
+          </Glass>
         </View>
       </View>
 
@@ -550,11 +590,15 @@ function EveningBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
   const minutes = s.eveningHour * 60 + s.eveningMinute;
   const index = Math.max(0, EVENING.findIndex((m) => m >= minutes));
   const mark = useMark(stage);
-  const MOON = 64 * k;
+  const MOON = 84 * k;
 
   useEffect(() => {
     stage.radius.value = -1;
-    stage.anchor.value = { x: 0.66, y: 0.3 };
+    stage.anchor.value = { x: 0.8, y: 0.26 };
+    // Shu floats up and becomes the evening moon, drowsy
+    stage.shu.setMood('sleepy');
+    stage.shu.setWatch(null);
+    stage.shu.show.value = withTiming(1, { duration: 300 });
     stage.hero.pearl.value = withTiming(0.75, { duration: 1000 });
     stage.hero.warm.value = withTiming(0.25, { duration: 1000 });
     stage.spark.i.value = withTiming(0.35, { duration: 800 });
@@ -577,7 +621,7 @@ function EveningBeat({ stage, onNext }: { stage: Stage; onNext: () => void }) {
         <View ref={mark} collapsable={false} style={{ width: MOON, height: MOON }} />
       </View>
       <View>
-        <Headline text={'One question,\neach evening.'} delay={200} />
+        <Headline text={'I’ll check in\neach evening.'} delay={200} />
       </View>
 
       <Reveal delay={900} style={styles.center}>
@@ -605,8 +649,7 @@ function ClearBeat({ stage, onDone }: { stage: Stage; onDone: () => void }) {
   const { width: W, height: H } = useWindowDimensions();
   const k = useTypeScale();
   const orb = useSharedValue(1); // 1 = the bright orb, 0 = settling into a stone
-  // Shu smiles while it is an orb, then closes its eyes as it becomes your stone
-  const smile = useSharedValue(0);
+  // Shu smiles while it is an orb, then fades into the stone it becomes
 
   useEffect(() => {
     feel.bloom();
@@ -624,7 +667,8 @@ function ClearBeat({ stage, onDone }: { stage: Stage; onDone: () => void }) {
     stage.drops.show.value = 1;
     stage.drops.burst.value = withDelay(120, withTiming(1, { duration: 1500, easing: glide }));
     setTimeout(() => ripple(W / 2, H / 2, 0.8), 380);
-    smile.value = withSequence(withDelay(250, withTiming(1, { duration: 300 })), withDelay(500, withTiming(0, { duration: 250 })));
+    stage.shu.setMood('happy');
+    stage.shu.show.value = withSequence(withTiming(1, { duration: 200 }), withDelay(700, withTiming(0, { duration: 250 })));
     stage.anchor.value = { x: 0.76, y: 0.74 };
     orb.value = withDelay(1100, withTiming(0, { duration: 10 }));
     const t1 = setTimeout(() => { stage.hero.presence.value = withTiming(0, { duration: 900, easing: melt }); }, 2100);
@@ -649,7 +693,6 @@ function ClearBeat({ stage, onDone }: { stage: Stage; onDone: () => void }) {
 
   return (
     <View style={[StyleSheet.absoluteFill, styles.clear]} pointerEvents="none">
-      <Eyes follow={stage.hero} show={smile} mood="happy" />
       <Headline text="You’re clear." delay={420} stagger={180} style={{ fontSize: 52, lineHeight: 60 }} />
     </View>
   );
@@ -664,7 +707,8 @@ const styles = StyleSheet.create({
   dotStep: { height: 5, borderRadius: 3 },
   ring: { borderWidth: 1 },
   stone: { paddingHorizontal: 26, paddingTop: 22, paddingBottom: 24 },
-  thought: { ...T.thought, fontFamily: font.thin, padding: 0, textAlignVertical: 'top' },
+  thought: { ...T.thought, fontFamily: font.thin, padding: 0, textAlign: 'center', textAlignVertical: 'center' },
+  middle: { justifyContent: 'center' },
   pill: { height: 52, paddingHorizontal: 26, minWidth: 190 },
   slab: { justifyContent: 'center' },
   clockRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
