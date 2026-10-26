@@ -1,7 +1,7 @@
 // Settings: a few grouped rows. Label on the left, its control on the right.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Platform, StyleSheet, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { type Appearance, guessedServerUrl, type HapticLevel, updateSettings, useSettings } from '../data/settings';
 import { ping, useTasks } from '../data/tasks';
 import { askPermission, formatClock, syncEvening } from '../feel/evening';
@@ -16,6 +16,8 @@ import { Reveal } from '../ui/motion';
 import { SheetHeader } from '../ui/SheetHeader';
 import { Glass } from '../scene/Glass';
 import { Eyes } from '../ui/Eyes';
+import { line } from '../shu/lines';
+import { Bubble, useSpeech } from '../shu/Speech';
 import { ScrollArea } from '../ui/ScrollArea';
 import { Txt } from '../ui/Txt';
 
@@ -31,6 +33,7 @@ export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay:
   const [address, setAddress] = useState(s.serverUrl ?? '');
   const [trip, setTrip] = useState<number | null | 'testing'>('testing');
   const [showTime, setShowTime] = useState(false);
+  const { said, say } = useSpeech();
 
   // a quiet check when the sheet opens; a touch only answers a real test
   const test = useCallback(async (byHand: boolean) => {
@@ -176,9 +179,12 @@ export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay:
 
         <Reveal delay={next()} style={styles.footer}>
           {/* Shu keeps you company down here */}
-          <Glass style={styles.shu} radius={26} lift={0.6} wobble={1.4} pearl={0.2}>
-            <Eyes size={54} mood={s.calmMotion ? 'sleepy' : 'awake'} />
-          </Glass>
+          <Pressable onPress={() => say(line('hello'))} accessibilityRole="button" accessibilityLabel="Shu">
+            <Glass style={styles.shu} radius={26} lift={0.6} wobble={1.4} pearl={0.2}>
+              <Eyes size={54} mood={said ? 'happy' : s.calmMotion ? 'sleepy' : 'awake'} />
+            </Glass>
+            <Bubble said={said} side="center" style={styles.shuBubble} />
+          </Pressable>
           <Txt variant="label" tone="soft" onPress={onReplay} accessibilityRole="button" style={styles.replay}>Replay welcome</Txt>
           <Txt variant="whisper" tone="faint">Shuchu 1.0</Txt>
         </Reveal>
@@ -229,5 +235,6 @@ const styles = StyleSheet.create({
   dial: { paddingBottom: space.m },
   footer: { marginTop: space.section, alignItems: 'center', gap: space.xs },
   shu: { width: 56, height: 52, marginBottom: space.m },
+  shuBubble: { bottom: 62, left: -80, right: -80 },
   replay: { paddingVertical: space.s },
 });

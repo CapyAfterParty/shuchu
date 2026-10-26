@@ -25,6 +25,8 @@ import { Reveal } from '../ui/motion';
 import { SheetHeader } from '../ui/SheetHeader';
 import { Glass } from '../scene/Glass';
 import { Eyes } from '../ui/Eyes';
+import { line } from '../shu/lines';
+import { Bubble, useSpeech } from '../shu/Speech';
 import { ScrollArea } from '../ui/ScrollArea';
 import { Txt } from '../ui/Txt';
 
@@ -43,6 +45,8 @@ export function Inbox({ onClose, onOpen }: { onClose: () => void; onOpen: (id: s
   // "still on its way" only means something once a desk is linked
   const linked = useTasks((s) => s.link === 'live');
   const [lettingGo, setLettingGo] = useState<string | null>(null);
+  const { said, say } = useSpeech();
+  const [awake, setAwake] = useState(false);
 
   const groups = useMemo(() => {
     const open = tasks.filter(isOpen);
@@ -87,10 +91,13 @@ export function Inbox({ onClose, onOpen }: { onClose: () => void; onOpen: (id: s
       <ScrollArea contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {empty && (
           <Reveal delay={200} style={styles.empty}>
-            {/* nothing to do: Shu dozes */}
-            <Glass style={styles.napper} radius={34} lift={0.7} melt={0} wobble={1.6} pearl={0.25}>
-              <Eyes size={68} mood="sleepy" />
-            </Glass>
+            {/* nothing to do: Shu dozes; tap to wake him */}
+            <Pressable onPress={() => { setAwake(true); say(line('nap')); setTimeout(() => setAwake(false), 2600); }} accessibilityRole="button" accessibilityLabel="Shu">
+              <Glass style={styles.napper} radius={34} lift={0.7} melt={0} wobble={1.6} pearl={0.25}>
+                <Eyes size={68} mood={awake ? 'awake' : 'sleepy'} />
+              </Glass>
+              <Bubble said={said} side="center" style={styles.napBubble} />
+            </Pressable>
             <Txt variant="display" align="center" tone="soft">All clear.</Txt>
           </Reveal>
         )}
@@ -284,6 +291,7 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: space.gutter, paddingBottom: 64 },
   empty: { paddingTop: 110, alignItems: 'center' },
   napper: { width: 72, height: 66, marginBottom: space.xl },
+  napBubble: { bottom: 76, left: -74, right: -74 },
   section: { marginTop: space.xxl },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: space.xs },
   rowWrap: { position: 'relative' },

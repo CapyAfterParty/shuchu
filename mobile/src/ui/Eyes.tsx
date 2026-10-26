@@ -108,13 +108,34 @@ export function Eyes({ size = 64, mood = 'awake', follow, show, gaze, watch = nu
     };
   });
 
+  // a tiny catchlight makes the eyes look alive; a blush when happy
+  const glint = useAnimatedStyle(() => {
+    const w = follow ? follow.hw.value * 2 * follow.presence.value : size;
+    const e = Math.max(3, w * 0.088);
+    const d = Math.max(1.2, e * 0.34);
+    return { width: d, height: d, borderRadius: d, top: e * 0.16, right: e * 0.14, opacity: lid.value > 0.5 ? 1 : 0 };
+  });
+  const blush = useAnimatedStyle(() => {
+    const w = follow ? follow.hw.value * 2 * follow.presence.value : size;
+    const e = Math.max(3, w * 0.088);
+    return { width: e * 1.9, height: e * 0.85, borderRadius: e, top: e * 1.05, marginLeft: -e * 0.15 };
+  });
+  const night = p.name === 'night';
+
   return (
     <Animated.View style={[follow ? null : StyleSheet.absoluteFill, frame, styles.center]} pointerEvents="none">
       <Animated.View style={[styles.row, body]}>
         {[0, 1].map((i) => (
-          mood === 'awake'
-            ? <Animated.View key={i} style={[eye, { backgroundColor: ink }]} />
-            : <Animated.View key={i} style={[eye, styles.arc, mood === 'happy' ? { borderTopWidth: 2, borderColor: ink } : { borderBottomWidth: 2, borderColor: ink }]} />
+          <View key={i} style={styles.eyeSpot}>
+            {mood === 'happy' && <Animated.View style={[styles.blush, blush, { backgroundColor: night ? 'rgba(255,150,120,0.22)' : 'rgba(255,140,120,0.32)' }]} />}
+            {mood === 'awake'
+              ? (
+                <Animated.View style={[eye, { backgroundColor: ink }]}>
+                  {!night && <Animated.View style={[styles.glint, glint]} />}
+                </Animated.View>
+              )
+              : <Animated.View style={[eye, styles.arc, mood === 'happy' ? { borderTopWidth: 2, borderColor: ink } : { borderBottomWidth: 2, borderColor: ink }]} />}
+          </View>
         ))}
       </Animated.View>
     </Animated.View>
@@ -134,4 +155,7 @@ const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center' },
   arc: { backgroundColor: 'transparent' },
+  eyeSpot: { alignItems: 'center' },
+  glint: { position: 'absolute', backgroundColor: 'rgba(255,255,255,0.92)' },
+  blush: { position: 'absolute' },
 });

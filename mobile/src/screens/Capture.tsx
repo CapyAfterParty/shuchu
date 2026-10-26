@@ -22,6 +22,8 @@ import { useTheme, useTypeScale } from '../theme/theme';
 import { font, space, spring, type as T } from '../theme/tokens';
 import { GlassButton } from '../ui/GlassButton';
 import { Eyes, type Mood } from '../ui/Eyes';
+import { line, MILESTONES } from '../shu/lines';
+import { Bubble, useSpeech } from '../shu/Speech';
 import { Icon } from '../ui/Icon';
 import { emptyFrame, melt, Reveal, useSpark } from '../ui/motion';
 import { Txt } from '../ui/Txt';
@@ -69,6 +71,8 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
   const sparkGlow = useSharedValue(0.3);
 
   const hasText = text.trim().length > 0;
+  const { said, say } = useSpeech();
+  const saidLong = useRef(false);
   const [joy, setJoy] = useState(false);
   const joyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(joyTimer.current), []);
@@ -100,6 +104,7 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
     if (!words) {
       feel.nope();
       sx.value = withSequence(withTiming(1.025, { duration: 70 }), withSpring(1, spring.jelly));
+      say(line('empty'));
       return;
     }
     setText('');
@@ -111,8 +116,25 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
     setJoy(true);
     clearTimeout(joyTimer.current);
     joyTimer.current = setTimeout(() => setJoy(false), 1600);
+    // Shu remarks on milestones, and now and then on a catch; never every time
+    const today = new Date().toDateString();
+    const n = tasks.filter((t) => new Date(t.createdAt).toDateString() === today).length + 1;
+    const remark = MILESTONES.has(n) ? line('milestone', n) : Math.random() < 0.3 ? line('caught') : null;
+    if (remark) setTimeout(() => say(remark), 650);
+    saidLong.current = false;
     const task = await catchThought(words);
     setArriving(task.id);
+  }
+
+  // A long press is a poke. Poke him a few times running and he gets a little indignant.
+  const pokes = useRef<number[]>([]);
+  function poke() {
+    const now = Date.now();
+    pokes.current = [...pokes.current.filter((t) => now - t < 6000), now];
+    say(line(pokes.current.length >= 3 ? 'pokeAgain' : 'poke'));
+    setJoy(true);
+    clearTimeout(joyTimer.current);
+    joyTimer.current = setTimeout(() => setJoy(false), 1200);
   }
 
   const lift = useAnimatedStyle(() => ({
@@ -162,6 +184,7 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
                 // the stone breathes a little with every keystroke
                 if (t.length > text.length) sy.value = withSequence(withTiming(1.012, { duration: 70 }), withSpring(1, spring.jelly));
                 setText(t);
+                if (t.length > 160 && !saidLong.current) { saidLong.current = true; say(line('long')); }
               }}
               placeholder={placeholder}
               placeholderTextColor={p.inkFaint}
@@ -189,6 +212,7 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
           <View style={styles.beadSpot} pointerEvents="box-none">
             <GlassButton
               onPress={() => void save()}
+              onLongPress={poke}
               style={styles.bead}
               radius={30}
               warm={ready}
@@ -201,6 +225,7 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
               {/* Shu lives in the save bead: watches your words, smiles when they're caught, dozes late at night */}
               <Eyes size={62} mood={shuMood} watch={hasText ? { x: -0.9, y: -0.55 } : null} />
             </GlassButton>
+            <Bubble said={said} side="left" style={styles.bubble} />
           </View>
         </View>
       </View>
@@ -254,4 +279,5 @@ const styles = StyleSheet.create({
   ghost: {},
   beadSpot: { position: 'absolute', right: 26, bottom: -26 },
   bead: { width: 66, height: 60 },
+  bubble: { right: 4, bottom: 68 },
 });

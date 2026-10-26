@@ -77,18 +77,28 @@ function render({ size, night = false, drop, eyes = true, time = 41000, transpar
   return bytes;
 }
 
-// Shu's eyes, exactly as the app draws them: two soft upright ovals a little above centre.
+// Shu's face, as the app draws it: two soft upright eyes a little above the
+// middle, each with a catchlight, and a warm blush beneath.
 function drawEyes(c, drop, night) {
   const w = drop.r * 2;
   const e = w * 0.088;
   const gap = w * 0.2;
   const cy = drop.y - w * 0.03;
-  const paint = new CK.Paint();
-  paint.setAntiAlias(true);
-  paint.setColor(night ? CK.Color(232, 240, 248, 0.92) : CK.Color(23, 33, 44, 0.8));
+  const blush = new CK.Paint();
+  blush.setAntiAlias(true);
+  blush.setColor(night ? CK.Color(255, 150, 120, 0.26) : CK.Color(255, 138, 118, 0.36));
+  blush.setMaskFilter(CK.MaskFilter.MakeBlur(CK.BlurStyle.Normal, e * 0.42, true));
+  const ink = new CK.Paint();
+  ink.setAntiAlias(true);
+  ink.setColor(night ? CK.Color(232, 240, 248, 0.92) : CK.Color(23, 33, 44, 0.82));
+  const light = new CK.Paint();
+  light.setAntiAlias(true);
+  light.setColor(CK.Color(255, 255, 255, 0.95));
   for (const s of [-1, 1]) {
     const cx = drop.x + s * (gap / 2 + e / 2);
-    c.drawRRect(CK.RRectXY(CK.XYWHRect(cx - e / 2, cy - e * 0.675, e, e * 1.35), e / 2, e / 2), paint);
+    c.drawOval(CK.XYWHRect(cx + s * e * 0.55 - e * 1.1, cy + e * 1.15, e * 2.2, e * 1.0), blush);
+    c.drawRRect(CK.RRectXY(CK.XYWHRect(cx - e / 2, cy - e * 0.675, e, e * 1.35), e / 2, e / 2), ink);
+    if (!night) c.drawCircle(cx + e * 0.14, cy - e * 0.36, e * 0.17, light);
   }
 }
 
