@@ -13,6 +13,7 @@ import Animated, {
   useAnimatedReaction,
   useAnimatedRef,
   useAnimatedStyle,
+  useDerivedValue,
   useFrameCallback,
   useSharedValue,
   withDelay,
@@ -36,6 +37,7 @@ import { Dial } from '../ui/Dial';
 import { GlassButton } from '../ui/GlassButton';
 import { glide, melt, Reveal, RevealContext } from '../ui/motion';
 import { placeOnScreen, ScrollArea, useScrollTrack } from '../ui/ScrollArea';
+import { Eyes } from '../ui/Eyes';
 import { Headline } from '../ui/Headline';
 import { Txt } from '../ui/Txt';
 import { EVENING } from './Settings';
@@ -295,13 +297,24 @@ function Arrive({ stage, onNext }: { stage: Stage; onNext: () => void }) {
     stage.spark.r.value = 6 + h * 4;
   });
 
+  // The drop is someone: once it has formed it opens its eyes, the light
+  // slides to a glint on its rim, and it gives a little hop before the next beat.
+  const eyesOpen = useDerivedValue(() => Math.max(0, Math.min(1, (hold.value - 0.8) / 0.2)));
+  const wake = () => {
+    stage.anchor.value = { x: 0.76, y: 0.74 };
+    stage.hero.sy.value = withSequence(withTiming(0.88, { duration: 120 }), withSpring(1, spring.jelly));
+    stage.hero.sx.value = withSequence(withTiming(1.08, { duration: 120 }), withSpring(1, spring.jelly));
+    feel.touch();
+    setTimeout(onNext, 1000);
+  };
+
   useAnimatedReaction(
     () => Math.floor(hold.value * 5),
     (now, before) => {
       if (before !== null && now > before && now < 5) scheduleOnRN(feel.swell, now / 5);
       if (hold.value >= 0.999 && done.value === 0) {
         done.value = 1;
-        scheduleOnRN(onNext);
+        scheduleOnRN(wake);
       }
     },
   );
@@ -353,6 +366,7 @@ function Arrive({ stage, onNext }: { stage: Stage; onNext: () => void }) {
       accessibilityActions={[{ name: 'activate' }]}
       onAccessibilityAction={begin}
     >
+      <Eyes follow={stage.hero} show={eyesOpen} />
       <Column gap={22 * k} scroll={false}>
         <Headline text="Breathe out." delay={700} stagger={160} style={{ fontSize: 44, lineHeight: 52 }} />
         <View ref={mark} collapsable={false} style={{ width: LIGHT, height: LIGHT, alignSelf: 'center', alignItems: 'center', justifyContent: 'center' }} pointerEvents="none">
@@ -585,6 +599,8 @@ function ClearBeat({ stage, onDone }: { stage: Stage; onDone: () => void }) {
   const { width: W, height: H } = useWindowDimensions();
   const k = useTypeScale();
   const orb = useSharedValue(1); // 1 = the bright orb, 0 = settling into a stone
+  // Shu smiles while it is an orb, then closes its eyes as it becomes your stone
+  const smile = useSharedValue(0);
 
   useEffect(() => {
     feel.bloom();
@@ -602,6 +618,8 @@ function ClearBeat({ stage, onDone }: { stage: Stage; onDone: () => void }) {
     stage.drops.show.value = 1;
     stage.drops.burst.value = withDelay(120, withTiming(1, { duration: 1500, easing: glide }));
     setTimeout(() => ripple(W / 2, H / 2, 0.8), 380);
+    smile.value = withSequence(withDelay(250, withTiming(1, { duration: 300 })), withDelay(500, withTiming(0, { duration: 250 })));
+    stage.anchor.value = { x: 0.76, y: 0.74 };
     orb.value = withDelay(1100, withTiming(0, { duration: 10 }));
     const t1 = setTimeout(() => { stage.hero.presence.value = withTiming(0, { duration: 900, easing: melt }); }, 2100);
     const t2 = setTimeout(() => {
@@ -625,6 +643,7 @@ function ClearBeat({ stage, onDone }: { stage: Stage; onDone: () => void }) {
 
   return (
     <View style={[StyleSheet.absoluteFill, styles.clear]} pointerEvents="none">
+      <Eyes follow={stage.hero} show={smile} mood="happy" />
       <Headline text="You’re clear." delay={420} stagger={180} style={{ fontSize: 52, lineHeight: 60 }} />
     </View>
   );

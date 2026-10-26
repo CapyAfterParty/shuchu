@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { catchThought, isOpen, useTasks } from '../data/tasks';
 import { feel } from '../feel/feel';
 import { Glass, type Frame } from '../scene/Glass';
+import { stoneFrame } from '../scene/world';
 import { useTheme, useTypeScale } from '../theme/theme';
 import { font, space, spring, type as T } from '../theme/tokens';
 import { GlassButton } from '../ui/GlassButton';
@@ -59,7 +60,7 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
   const open = useMemo(() => tasks.filter(isOpen), [tasks]);
   const placeholder = useMemo(() => PLACEHOLDERS[Math.floor(Math.random() * PLACEHOLDERS.length)], []);
 
-  const stone = useSharedValue<Frame>(emptyFrame);
+  const stone = stoneFrame;
   const bead = useSharedValue<Frame>(emptyFrame);
   const sx = useSharedValue(1);
   const sy = useSharedValue(1);

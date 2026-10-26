@@ -1,13 +1,15 @@
 // The whole app on one stage. Screens don't slide in from the side: the glass
 // melts away and new glass condenses, while the mist stays put behind it all.
 
-import { useEffect, useState } from 'react';
-import { BackHandler, Keyboard } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { AppState, BackHandler, Keyboard } from 'react-native';
 import { useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { updateSettings, useSettings } from '../data/settings';
+import { isOpen, useTasks } from '../data/tasks';
 import { haze } from '../scene/world';
 import { Capture } from '../screens/Capture';
 import { Detail } from '../screens/Detail';
+import { Hello } from '../screens/Hello';
 import { Inbox } from '../screens/Inbox';
 import { Onboarding } from '../screens/Onboarding';
 import { Settings } from '../screens/Settings';
@@ -21,8 +23,30 @@ export default function Home() {
   const [sheet, setSheet] = useState<SheetName>(null);
   const [detail, setDetail] = useState<string | null>(null);
   const capture = useSharedValue(0);
+  const waiting = useTasks((s) => s.tasks.filter(isOpen).length);
 
-  const covered = !onboarded || sheet !== null;
+  // Hello greets you on every launch, and again after a while away.
+  const [hello, setHello] = useState(onboarded);
+  const [helloCovering, setHelloCovering] = useState(onboarded);
+  // the first hello continues from the launch screen's drop; later ones condense from dew
+  const [cold, setCold] = useState(true);
+  const away = useRef<number | null>(null);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background') away.current = Date.now();
+      if (state === 'active' && away.current && Date.now() - away.current > 5 * 60_000 && onboarded) {
+        setSheet(null);
+        setDetail(null);
+        setCold(false);
+        setHello(true);
+        setHelloCovering(true);
+      }
+      if (state === 'active') away.current = null;
+    });
+    return () => sub.remove();
+  }, [onboarded]);
+
+  const covered = !onboarded || sheet !== null || helloCovering;
 
   useEffect(() => {
     capture.value = covered ? withTiming(0, { duration: 380 }) : withSpring(1, spring.sheet);
@@ -66,6 +90,10 @@ export default function Home() {
       </Sheet>
 
       {!onboarded && <Onboarding onDone={() => {}} />}
+
+      {onboarded && hello && (
+        <Hello waiting={waiting} fromSplash={cold} onLeave={() => setHelloCovering(false)} onGone={() => { setHello(false); setCold(false); }} />
+      )}
     </>
   );
 }

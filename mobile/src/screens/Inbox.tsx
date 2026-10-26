@@ -23,6 +23,8 @@ import { GlassButton } from '../ui/GlassButton';
 import { Icon } from '../ui/Icon';
 import { Reveal } from '../ui/motion';
 import { SheetHeader } from '../ui/SheetHeader';
+import { Glass } from '../scene/Glass';
+import { Eyes } from '../ui/Eyes';
 import { ScrollArea } from '../ui/ScrollArea';
 import { Txt } from '../ui/Txt';
 
@@ -85,6 +87,10 @@ export function Inbox({ onClose, onOpen }: { onClose: () => void; onOpen: (id: s
       <ScrollArea contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {empty && (
           <Reveal delay={200} style={styles.empty}>
+            {/* nothing to do: Shu dozes */}
+            <Glass style={styles.napper} radius={34} lift={0.7} melt={0} wobble={1.6} pearl={0.25}>
+              <Eyes size={68} mood="sleepy" />
+            </Glass>
             <Txt variant="display" align="center" tone="soft">All clear.</Txt>
           </Reveal>
         )}
@@ -276,7 +282,8 @@ function StillTrue({ task, onKeep, onLetGo }: { task: Task; onKeep: () => void; 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   scroll: { paddingHorizontal: space.gutter, paddingBottom: 64 },
-  empty: { paddingTop: 140 },
+  empty: { paddingTop: 110, alignItems: 'center' },
+  napper: { width: 72, height: 66, marginBottom: space.xl },
   section: { marginTop: space.xxl },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: space.xs },
   rowWrap: { position: 'relative' },

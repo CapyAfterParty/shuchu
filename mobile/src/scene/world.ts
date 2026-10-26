@@ -35,6 +35,8 @@ export const sceneClock = makeMutable(0);
 export const motion = makeMutable(1);
 /** Depth of field behind sheets. */
 export const haze = makeMutable(0);
+/** Where the capture stone is on screen, so other glass can flow into it. */
+export const stoneFrame = makeMutable({ x: 0, y: 0, w: 0, h: 0 });
 /** 0 = mist (day), 1 = night. Animated, so the world crossfades. */
 export const themeBlend = makeMutable(0);
 
