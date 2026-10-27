@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start": "tsc && node dist/server/server.js"
+    "start": "tsc && node dist/server/server.js",
+    "setup": "npm install && npm --prefix desk install && npm --prefix desk run build",
+    "desk": "npm --prefix desk run build"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

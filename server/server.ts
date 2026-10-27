@@ -18,7 +18,6 @@ const listeners = new Set<ServerResponse>();
 const PAGES: Record<string, string> = {
   "/": "public/phone.html",
   "/phone": "public/phone.html",
-  "/desk": "public/desk.html",
   "/sw.js": "public/sw.js", // served from the root so it can look after the whole app
   "/manifest.webmanifest": "public/manifest.webmanifest",
 };
@@ -31,6 +30,8 @@ const TYPES: Record<string, string> = {
   ".svg": "image/svg+xml",
   ".png": "image/png",
   ".woff2": "font/woff2",
+  ".jpg": "image/jpeg",
+  ".ico": "image/x-icon",
 };
 
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -50,6 +51,8 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (req.method === "PATCH" && path.startsWith("/tasks/")) return updateTask(req, res, path.slice(7));
   if (req.method === "GET" && path === "/ping") return sendJson(res, 200, { ok: true, at: Date.now() });
   if (req.method === "GET" && path === "/events") return listen(req, res);
+  if (req.method === "GET" && (path === "/desk" || path === "/desk/")) return sendDesk(res, "index.html");
+  if (req.method === "GET" && path.startsWith("/desk/")) return sendDesk(res, path.slice(6));
   if (req.method === "GET" && PAGES[path]) return sendFile(res, PAGES[path]);
   if (req.method === "GET" && path.startsWith("/public/")) return sendFile(res, path.slice(1));
   if (req.method === "GET" && path.startsWith("/js/")) return sendFile(res, "dist/" + path.slice(4));
@@ -127,6 +130,18 @@ async function sendFile(res: ServerResponse, relative: string): Promise<void> {
   } catch {
     sendJson(res, 404, { error: "not found" });
   }
+}
+
+// The desk app is built into desk/dist (npm run setup). Until it is, say so.
+async function sendDesk(res: ServerResponse, relative: string): Promise<void> {
+  try {
+    await readFile(resolve(ROOT, "desk/dist/index.html"));
+  } catch {
+    res.writeHead(503, { "content-type": "text/plain; charset=utf-8" });
+    res.end("The desk app isn't built yet. Run: npm run setup");
+    return;
+  }
+  return sendFile(res, "desk/dist/" + relative);
 }
 
 function sendJson(res: ServerResponse, status: number, value: unknown): void {

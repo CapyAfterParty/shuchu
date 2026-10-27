@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Shuchu</title>
+    <meta name="theme-color" content="#D9E2EB" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0C1219" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/icon-180.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Urbanist:ital,wght@0,200;0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <canvas id="scene" aria-hidden="true"></canvas>
+    <header class="bar">
+      <span class="wordmark">Shuchu</span>
+      <span class="link" id="link" title="Linked to your Shuchu server"><i></i><span class="label">connecting</span></span>
+      <span class="grow"></span>
+      <button class="icon-btn" id="porcelain-btn" aria-pressed="false" title="Porcelain" data-glass data-radius="round" data-lift="0.4">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5c-3.6 0-6.5 1.4-6.5 3.2v1.8c0 4.5 2.9 8.5 6.5 9.9 3.6-1.4 6.5-5.4 6.5-9.9V6.7c0-1.8-2.9-3.2-6.5-3.2z" /></svg>
+      </button>
+      <button class="icon-btn" id="keys-btn" title="Keyboard" data-glass data-radius="round" data-lift="0.4">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6.5" width="18" height="11" rx="2.5" /><path d="M7 10.5h.01M10.3 10.5h.01M13.7 10.5h.01M17 10.5h.01M8 14h8" /></svg>
+      </button>
+    </header>
+    <main id="view" tabindex="-1"></main>
+    <div id="keys" class="keys" hidden>
+      <div class="keys-card" data-glass data-radius="28" data-lift="0.7">
+        <h3>Keyboard</h3>
+        <dl>
+          <dt><kbd>N</kbd></dt><dd>Catch a thought</dd>
+          <dt><kbd>S</kbd></dt><dd>Start: how long do you have?</dd>
+          <dt><kbd>1</kbd>–<kbd>4</kbd></dt><dd>15 min, 30 min, 1 h, 2 h</dd>
+          <dt><kbd>Enter</kbd></dt><dd>Begin, or the next step</dd>
+          <dt><kbd>D</kbd> <kbd>N</kbd> <kbd>L</kbd></dt><dd>Done, not now, let go</dd>
+          <dt><kbd>Esc</kbd></dt><dd>Back</dd>
+        </dl>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
