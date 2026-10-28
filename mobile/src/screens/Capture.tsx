@@ -14,7 +14,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { catchThought, isOpen, useTasks } from '../data/tasks';
+import { catchThought, isOpen, linkNotice, useTasks } from '../data/tasks';
 import { feel } from '../feel/feel';
 import { Glass, type Frame } from '../scene/Glass';
 import { stoneFrame } from '../scene/world';
@@ -59,7 +59,8 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
   const [ghost, setGhost] = useState<{ key: number; text: string } | null>(null);
   const tasks = useTasks((s) => s.tasks);
   const link = useTasks((s) => s.link);
-  const held = useTasks((s) => s.outbox.length);
+  const held = useTasks((s) => s.pending.length);
+  const linked = useTasks((s) => s.linked !== null);
   const open = useMemo(() => tasks.filter(isOpen), [tasks]);
   const placeholder = useMemo(() => PLACEHOLDERS[Math.floor(Math.random() * PLACEHOLDERS.length)], []);
 
@@ -72,6 +73,8 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
 
   const hasText = text.trim().length > 0;
   const { said, say } = useSpeech();
+  // news about the computer link (just linked from a scanned code)
+  useEffect(() => linkNotice.subscribe(() => { const n = linkNotice.get(); if (n) setTimeout(() => say(n.text), 900); }), [say]);
   const saidLong = useRef(false);
   const [joy, setJoy] = useState(false);
   const joyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -150,11 +153,13 @@ export function Capture({ presence, active, onOpenInbox, onOpenSettings }: Props
       <Fade presence={presence} style={styles.header}>
         <View style={styles.title}>
           <Txt variant="display">{DAYS[now.getDay()]}</Txt>
-          {/* the one sign of the desk link: a dot that fills when it's live */}
-          <View
-            style={[styles.dot, { backgroundColor: link === 'live' ? p.inkSoft : 'transparent', borderColor: held > 0 || link === 'live' ? p.inkSoft : p.inkFaint }]}
-            accessibilityLabel={link === 'live' ? 'Desk linked' : held > 0 ? `${held} waiting on your phone` : 'Desk not linked'}
-          />
+          {/* the one sign of the computer link: a dot that fills when it's live */}
+          {linked && (
+            <View
+              style={[styles.dot, { backgroundColor: link === 'live' ? p.inkSoft : 'transparent', borderColor: p.inkSoft }]}
+              accessibilityLabel={link === 'live' ? 'Linked to your computer' : held > 0 ? `${held} waiting on your phone` : 'Reconnecting to your computer'}
+            />
+          )}
         </View>
         <GlassButton onPress={onOpenSettings} style={styles.tune} radius={23} label="Settings" presence={presence}>
           <Icon name="tune" color={p.inkSoft} />

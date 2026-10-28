@@ -1,9 +1,10 @@
 // Settings: a few grouped rows. Label on the left, its control on the right.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { type Appearance, guessedServerUrl, type HapticLevel, updateSettings, useSettings } from '../data/settings';
-import { ping, useTasks } from '../data/tasks';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { type Appearance, type HapticLevel, updateSettings, useSettings } from '../data/settings';
+import { unlink, useTasks } from '../data/tasks';
+import { LinkComputer } from './LinkComputer';
 import { askPermission, formatClock, syncEvening } from '../feel/evening';
 import { feel, previewSound } from '../feel/feel';
 import { useTheme } from '../theme/theme';
@@ -24,26 +25,16 @@ import { Txt } from '../ui/Txt';
 /** Evening times: 6:00 PM to 11:45 PM in quarter hours. */
 export const EVENING = Array.from({ length: 24 }, (_, i) => 18 * 60 + i * 15);
 
-const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null;
 
 export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay: () => void }) {
   const p = useTheme();
   const s = useSettings((x) => x);
   const link = useTasks((x) => x.link);
-  const [address, setAddress] = useState(s.serverUrl ?? '');
-  const [trip, setTrip] = useState<number | null | 'testing'>('testing');
+  const linked = useTasks((x) => x.linked);
+  const computer = useTasks((x) => x.devices.find((d) => !/Android|iPhone/.test(d.platform)));
+  const [scanning, setScanning] = useState(false);
   const [showTime, setShowTime] = useState(false);
   const { said, say } = useSpeech();
-
-  // a quiet check when the sheet opens; a touch only answers a real test
-  const test = useCallback(async (byHand: boolean) => {
-    setTrip('testing');
-    const ms = await ping((address.trim() || guessedServerUrl()));
-    setTrip(ms);
-    if (byHand) (ms === null ? feel.nope : feel.touch)();
-  }, [address]);
-  useEffect(() => { void test(false); }, []);
-  const commitAddress = () => { updateSettings({ serverUrl: address.trim() || null }); void test(true); };
 
   const minutes = s.eveningHour * 60 + s.eveningMinute;
   const eveIndex = Math.max(0, EVENING.findIndex((m) => m >= minutes));
@@ -53,8 +44,17 @@ export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay:
   useEffect(() => { void syncEvening(); }, [s.eveningOn, s.eveningHour, s.eveningMinute]);
   const eveLabel = useCallback((v: number) => (v % 60 === 0 ? `${(v / 60) % 12 || 12}PM` : null), []);
 
-  const linked = typeof trip === 'number';
-  const linkWords = trip === 'testing' ? 'Looking…' : linked ? `Linked · ${trip} ms` : 'Not linked';
+  const seen = computer ? ago(computer.seen) : null;
+  const linkWords = link === 'offline' ? 'Offline · saved on this phone' : computer ? 'Linked to your computer' : 'Linked · waiting for your computer';
+
+  if (scanning) {
+    return (
+      <View style={styles.fill}>
+        <SheetHeader title="Link a computer" onClose={() => setScanning(false)} closeLabel="Back to settings" />
+        <LinkComputer onDone={() => { setScanning(false); say('Linked! I’ll keep both in step.'); }} onCancel={() => setScanning(false)} />
+      </View>
+    );
+  }
 
   let delay = 100;
   const next = () => (delay += 50);
@@ -64,33 +64,38 @@ export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay:
       <SheetHeader title="Settings" onClose={onClose} closeLabel="Close settings" />
 
       <ScrollArea contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <Group title="Desk" delay={next()}>
-          <Row>
-            <View style={[styles.dot, { backgroundColor: linked && link !== 'offline' ? p.inkSoft : 'transparent', borderColor: p.inkSoft }]} />
-            <Txt variant="body" style={styles.grow}>{linkWords}</Txt>
-            <GlassButton onPress={commitAddress} style={styles.test} radius={16} label="Test the link">
-              <Txt variant="label" style={styles.small}>Test</Txt>
-            </GlassButton>
-          </Row>
-          <Rule />
-          <Row>
-            <Icon name="link" size={18} color={p.inkFaint} />
-            <TextInput
-              allowFontScaling={false}
-              underlineColorAndroid="transparent"
-              value={address}
-              onChangeText={setAddress}
-              onEndEditing={commitAddress}
-              placeholder={guessedServerUrl()}
-              placeholderTextColor={p.inkFaint}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              returnKeyType="done"
-              style={[styles.address, { color: p.ink }, webNoOutline]}
-              accessibilityLabel="Desk address"
-            />
-          </Row>
+        <Group title="Computer" delay={next()}>
+          {linked ? (
+            <>
+              <Row tall>
+                <View style={[styles.dot, { backgroundColor: link === 'live' ? p.inkSoft : 'transparent', borderColor: p.inkSoft }]} />
+                <View style={styles.grow}>
+                  <Txt variant="body" numberOfLines={1}>{linkWords}</Txt>
+                  <Txt variant="whisper" tone="faint" style={styles.sub} numberOfLines={1}>
+                    {seen ? `Seen ${seen} · ` : ''}encrypted on your devices
+                  </Txt>
+                </View>
+              </Row>
+              <Rule />
+              <Row>
+                <Icon name="link" size={18} color={p.inkFaint} />
+                <Txt variant="body" tone="soft" style={styles.grow} onPress={() => { feel.touch(); void unlink(); say('Unlinked. Everything’s still here.'); }} accessibilityRole="button">
+                  Unlink this phone
+                </Txt>
+              </Row>
+            </>
+          ) : (
+            <Row tall>
+              <Icon name="link" size={19} color={p.inkSoft} />
+              <View style={styles.grow}>
+                <Txt variant="body">Link a computer</Txt>
+                <Txt variant="whisper" tone="faint" style={styles.sub}>Your thoughts wait on your desk</Txt>
+              </View>
+              <GlassButton onPress={() => { feel.touch(); setScanning(true); }} style={styles.test} radius={16} label="Scan the code">
+                <Txt variant="label" style={styles.small}>Scan</Txt>
+              </GlassButton>
+            </Row>
+          )}
         </Group>
 
         <Group title="Evening" delay={next()}>
@@ -231,10 +236,14 @@ const styles = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 4, borderWidth: 1, marginHorizontal: 5 },
   test: { height: 32, paddingHorizontal: 14 },
   small: { fontSize: 13 },
-  address: { ...T.label, flex: 1, paddingVertical: space.m },
   dial: { paddingBottom: space.m },
   footer: { marginTop: space.section, alignItems: 'center', gap: space.xs },
   shu: { width: 56, height: 52, marginBottom: space.m },
   shuBubble: { bottom: 62, left: -80, right: -80 },
   replay: { paddingVertical: space.s },
 });
+
+function ago(t: number): string {
+  const m = Math.round((Date.now() - t) / 60_000);
+  return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`;
+}

@@ -13,10 +13,6 @@
       "bundleIdentifier": "app.shuchu",
       "infoPlist": {
         "NSMotionUsageDescription": "Shuchu tilts its light with your phone, so the glass feels real.",
-        "NSLocalNetworkUsageDescription": "Shuchu sends the thoughts you catch to the Shuchu app on your own computer, over your Wi-Fi.",
-        "NSAppTransportSecurity": {
-          "NSAllowsLocalNetworking": true
-        },
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -84,7 +80,16 @@
           }
         }
       ],
-      "./plugins/withLeanGradle"
+      "./plugins/withLeanGradle",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Shuchu uses the camera only to scan the code that links your computer.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ]
     ],
     "runtimeVersion": {
       "policy": "appVersion"

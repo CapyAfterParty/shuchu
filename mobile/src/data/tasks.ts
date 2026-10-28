@@ -1,242 +1,244 @@
-// Tasks on this phone, and how they reach the desk.
+// Tasks on this phone, and how they reach your computer.
 //
-// Local first: every change is written to the phone before anything else,
-// then queued in an outbox. The outbox drains to the server in order and only
-// forgets an operation once the server confirms it. The server ignores
-// repeats, so retrying is always safe. Live updates arrive over SSE.
+// Local first: every change is written to the phone before anything else.
+// Once linked to a computer (it shows a QR code; see linkcore.ts), changed
+// tasks are sealed on the phone and swapped with the sync server: what
+// changed here goes up, what changed there comes down, and for each task the
+// latest edit wins. Nothing readable ever leaves the phone. Offline, changes
+// simply wait and go up when the connection returns.
 
-import { randomUUID } from 'expo-crypto';
-import { AppState } from 'react-native';
-import EventSource from 'react-native-sse';
-import type { NewTask, SyncEvent, Task, TaskPatch } from '../../../shared/task';
+import { getRandomBytes, randomUUID } from 'expo-crypto';
+import { AppState, Platform } from 'react-native';
+import type { NewTask, Task, TaskPatch } from '../../../shared/task';
 import { guess } from './guess';
-import { serverUrl, settings } from './settings';
-import { createStore, loadList, save, useStore } from './store';
+import { exchange, newToken, parseLink, seal, unseal, type Link, type Sealed } from './linkcore';
+import { createStore, load, loadList, save, useStore } from './store';
 
-type Op = { kind: 'create'; task: NewTask } | { kind: 'update'; id: string; patch: TaskPatch };
-export type Link = 'connecting' | 'live' | 'offline';
+/** local: not linked · live: linked and in step · syncing · offline: linked, can't reach the server */
+export type LinkState = 'local' | 'live' | 'syncing' | 'offline';
+export interface Device { id: string; name: string; platform: string; seen: number }
 
 interface State {
   ready: boolean;
   tasks: Task[];
-  outbox: Op[];
-  link: Link;
-  /** Phone → desk time of the most recent catch, in ms. */
+  /** Tasks changed here that the server hasn't confirmed yet. */
+  pending: string[];
+  link: LinkState;
+  linked: Link | null;
+  devices: Device[];
+  /** Phone → server time of the most recent catch, in ms. */
   lastTrip: { id: string; ms: number } | null;
 }
 
 const TASKS_KEY = 'shuchu.tasks.v1';
-const OUTBOX_KEY = 'shuchu.outbox.v1';
+const SYNC_KEY = 'shuchu.sync.v1';
 
-export const tasksStore = createStore<State>({ ready: false, tasks: [], outbox: [], link: 'connecting', lastTrip: null });
+interface Saved { link: Link | null; since: number; pending: string[]; me: string }
+
+export const tasksStore = createStore<State>({ ready: false, tasks: [], pending: [], link: 'local', linked: null, devices: [], lastTrip: null });
 export const useTasks = <S,>(select: (s: State) => S) => useStore(tasksStore, select);
 
+const random = (n: number) => getRandomBytes(n);
+let saved: Saved = { link: null, since: 0, pending: [], me: '' };
 const savedAt = new Map<string, number>();
-let source: EventSource | null = null;
-let flushing = false;
-let retryTimer: ReturnType<typeof setTimeout> | undefined;
-let retryDelay = 1000;
-let sending: Op | null = null; // the op currently in flight; never merged into
-let linkTimer: ReturnType<typeof setTimeout> | undefined;
-let linkDelay = 1000;
+const joinListeners = new Set<(d: Device) => void>();
+
+/** A line for Shu to say about the link, wherever he is (just linked, say). */
+export const linkNotice = createStore<{ text: string; key: number } | null>(null);
+const notice = (text: string) => linkNotice.set({ text, key: Date.now() });
 
 export async function startTasks(): Promise<void> {
-  const [tasks, outbox] = await Promise.all([loadList<Task>(TASKS_KEY), loadList<Op>(OUTBOX_KEY)]);
-  tasksStore.set((s) => ({ ...s, ready: true, tasks: sortTasks(tasks), outbox }));
-  connect();
-  // iOS drops sockets in the background: relink whenever we come back
+  const [tasks, stored] = await Promise.all([loadList<Task>(TASKS_KEY), load<Saved>(SYNC_KEY, saved)]);
+  saved = { ...stored, me: stored.me || newToken(random).slice(0, 16) };
+  tasksStore.set((s) => ({ ...s, ready: true, tasks: sortTasks(tasks), pending: saved.pending, linked: saved.link, link: saved.link ? 'syncing' : 'local' }));
+  void save(SYNC_KEY, saved);
+  if (saved.link) void sync();
   AppState.addEventListener('change', (state) => {
-    if (state === 'active' && tasksStore.get().link !== 'live') connect();
-    if (state === 'active') void flush();
+    if (state === 'active') { quietSince = Date.now(); void sync(); }
   });
-  let lastUrl = settings.get().serverUrl;
-  settings.subscribe(() => {
-    if (settings.get().serverUrl === lastUrl) return;
-    lastUrl = settings.get().serverUrl;
-    connect();
-  });
+}
+
+const stamp = (t: Task) => Date.parse(t.updatedAt ?? t.createdAt) || 0;
+
+function changed(task: Task, fresh = false) {
+  tasksStore.set((s) => ({
+    ...s,
+    tasks: fresh ? [task, ...s.tasks] : s.tasks.map((t) => (t.id === task.id ? task : t)),
+    pending: s.pending.includes(task.id) ? s.pending : [...s.pending, task.id],
+  }));
 }
 
 /** Catch a thought. Resolves once it is safely stored on this phone. */
 export async function catchThought(text: string): Promise<Task> {
   const originalText = text.trim();
   const history = tasksStore.get().tasks;
-  const input: NewTask = { id: randomUUID(), originalText, createdAt: new Date().toISOString(), ...guess(originalText, history) };
-  const task: Task = { ...input, status: 'open' };
+  const now = new Date().toISOString();
+  const input: NewTask = { id: randomUUID(), originalText, createdAt: now, ...guess(originalText, history) };
+  const task: Task = { ...input, status: 'open', updatedAt: now };
   savedAt.set(task.id, Date.now());
-  tasksStore.set((s) => ({ ...s, tasks: [task, ...s.tasks], outbox: [...s.outbox, { kind: 'create', task: input }] }));
+  changed(task, true);
   await persist();
-  void flush();
+  soon();
   return task;
 }
 
 export async function updateTask(id: string, patch: TaskPatch): Promise<void> {
-  tasksStore.set((s) => ({
-    ...s,
-    tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)),
-    outbox: queueUpdate(s.outbox, id, patch),
-  }));
+  const current = tasksStore.get().tasks.find((t) => t.id === id);
+  if (!current) return;
+  changed({ ...current, ...patch, updatedAt: new Date().toISOString() });
   await persist();
-  void flush();
-}
-
-// Fold an edit into a waiting update for that task. Creates are never
-// changed (the desk ignores repeated creates, so their fields would be lost),
-// and the op already in flight is never touched.
-function queueUpdate(outbox: Op[], id: string, patch: TaskPatch): Op[] {
-  const pending = outbox.findIndex((op) => op !== sending && op.kind === 'update' && op.id === id);
-  if (pending >= 0) {
-    const op = outbox[pending] as Extract<Op, { kind: 'update' }>;
-    return outbox.map((o, i) => (i === pending ? { kind: 'update', id, patch: { ...op.patch, ...patch } } : o));
-  }
-  return [...outbox, { kind: 'update', id, patch }];
+  soon();
 }
 
 async function persist(): Promise<void> {
-  const { tasks, outbox } = tasksStore.get();
-  await Promise.all([save(OUTBOX_KEY, outbox), save(TASKS_KEY, tasks)]);
+  const { tasks, pending } = tasksStore.get();
+  saved = { ...saved, pending };
+  await Promise.all([save(TASKS_KEY, tasks), save(SYNC_KEY, saved)]);
 }
 
-async function request(path: string, method: string, body?: unknown): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 6000);
+// ---------- linking ----------
+
+/** Join the link in a scanned code or an opened address. False if it isn't one. */
+export async function joinLink(text: string): Promise<boolean> {
+  const link = parseLink(text);
+  if (!link) return false;
+  if (saved.link?.token === link.token) { void sync(); return true; }
+  // everything already on the phone goes up to the shared space
+  const all = tasksStore.get().tasks.map((t) => t.id);
+  saved = { ...saved, link, since: 0, pending: all };
+  lastPresence = 0;
+  tasksStore.set((s) => ({ ...s, linked: link, link: 'syncing', pending: all, devices: [] }));
+  await save(SYNC_KEY, saved);
+  notice('Linked! Your computer will see everything.');
+  await sync();
+  return true;
+}
+
+/** Forget the link on this phone. The tasks stay here, and on the computer. */
+export async function unlink(): Promise<void> {
+  saved = { ...saved, link: null, since: 0 };
+  tasksStore.set((s) => ({ ...s, linked: null, link: 'local', devices: [] }));
+  await save(SYNC_KEY, saved);
+}
+
+/** Called when a computer joins the link (it shows the code; the phone scans). */
+export function onJoin(fn: (d: Device) => void): () => void {
+  joinListeners.add(fn);
+  return () => joinListeners.delete(fn);
+}
+
+// ---------- the round trip ----------
+
+let busy = false;
+let again = false;
+let timer: ReturnType<typeof setTimeout> | undefined;
+let quietSince = Date.now();
+let lastPresence = 0;
+let failures = 0;
+
+function soon(ms = 200) {
+  quietSince = Date.now();
+  clearTimeout(timer);
+  timer = setTimeout(() => void sync(), ms);
+}
+
+function nextDelay(): number {
+  if (failures) return Math.min(60_000, 2000 * 2 ** failures);
+  if (AppState.currentState !== 'active') return 120_000;
+  return Date.now() - quietSince < 10 * 60_000 ? 3000 : 10_000;
+}
+
+/** Push what changed, pull what's new. Safe to call any time. */
+export async function sync(): Promise<void> {
+  const link = saved.link;
+  if (!link) return;
+  if (busy) { again = true; return; }
+  busy = true;
+  clearTimeout(timer);
   try {
-    return await fetch(`${serverUrl()}${path}`, {
-      method,
-      headers: { 'content-type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: controller.signal,
+    const { tasks, pending } = tasksStore.get();
+    const byId = new Map(tasks.map((t) => [t.id, t]));
+    const push: Sealed[] = [];
+    const sent = new Map<string, number>();
+    for (const id of pending) {
+      const t = byId.get(id);
+      if (!t) continue;
+      sent.set(id, stamp(t));
+      push.push({ id, u: stamp(t), v: seal(link.token, t, random(24)) });
+      if (push.length >= 200) break;
+    }
+    if (Date.now() - lastPresence > 5 * 60_000) {
+      const d: Device = { id: saved.me, name: 'Phone', platform: Platform.OS === 'ios' ? 'iPhone' : Platform.OS === 'android' ? 'Android' : 'Android browser', seen: Date.now() };
+      push.push({ id: `device:${saved.me}`, u: d.seen, v: seal(link.token, { kind: 'device', ...d }, random(24)) });
+    }
+    const { seq, records } = await exchange(link, saved.since, push);
+    if (saved.link?.token !== link.token) return;
+    if (push.some((r) => r.id.startsWith('device:'))) lastPresence = Date.now();
+
+    const firstLook = saved.since === 0;
+    const devices = new Map(tasksStore.get().devices.map((d) => [d.id, d]));
+    const incoming: Task[] = [];
+    for (const r of records) {
+      if (r.id.startsWith('device:')) {
+        const d = unseal<Device>(link.token, r.v);
+        if (!d || d.id === saved.me) continue;
+        const known = devices.has(d.id);
+        devices.set(d.id, { id: d.id, name: d.name, platform: d.platform, seen: d.seen });
+        if (!known && !firstLook) joinListeners.forEach((fn) => fn(d));
+        continue;
+      }
+      const t = unseal<Task>(link.token, r.v);
+      if (t && t.id === r.id) incoming.push(t);
+    }
+
+    tasksStore.set((s) => {
+      const map = new Map(s.tasks.map((t) => [t.id, t]));
+      for (const t of incoming) {
+        const mine = map.get(t.id);
+        if (!mine || stamp(mine) < stamp(t)) map.set(t.id, t);
+      }
+      // confirmed: forget pending ids whose task hasn't changed since it was sent
+      const still = s.pending.filter((id) => { const u = sent.get(id); const t = map.get(id); return u === undefined || (t !== undefined && stamp(t) !== u); });
+      let lastTrip = s.lastTrip;
+      for (const id of sent.keys()) {
+        const at = savedAt.get(id);
+        if (at !== undefined) { savedAt.delete(id); lastTrip = { id, ms: Date.now() - at }; }
+      }
+      return { ...s, tasks: sortTasks([...map.values()]), pending: still, devices: [...devices.values()].sort((a, b) => b.seen - a.seen), link: 'live', lastTrip };
     });
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
-async function send(op: Op): Promise<void> {
-  if (op.kind === 'create') {
-    const res = await request('/tasks', 'POST', op.task);
-    if (res.ok || res.status === 400) return; // 400 can never succeed: let it go, the task stays on the phone
-    throw new Error(`create ${res.status}`);
-  }
-  const res = await request(`/tasks/${encodeURIComponent(op.id)}`, 'PATCH', op.patch);
-  if (res.status === 404) {
-    // The desk never got this task: send the whole thing, then its state.
-    const local = tasksStore.get().tasks.find((t) => t.id === op.id);
-    if (local) {
-      await send({ kind: 'create', task: local });
-      await send(op);
+    if (seq < saved.since) {
+      // the server forgot this space (unused for a long time): send everything again
+      saved = { ...saved, since: 0, pending: tasksStore.get().tasks.map((t) => t.id) };
+      tasksStore.set((s) => ({ ...s, pending: saved.pending }));
+      again = true;
+    } else {
+      saved = { ...saved, since: seq };
     }
-    return;
-  }
-  if (res.ok || res.status === 400) return;
-  throw new Error(`update ${res.status}`);
-}
-
-export async function flush(): Promise<void> {
-  if (flushing) return;
-  flushing = true;
-  clearTimeout(retryTimer);
-  try {
-    for (let op = tasksStore.get().outbox[0]; op; op = tasksStore.get().outbox[0]) {
-      sending = op;
-      await send(op);
-      // remove exactly the op that was sent
-      tasksStore.set((s) => ({ ...s, outbox: s.outbox.filter((o) => o !== op) }));
-      sending = null;
-      await save(OUTBOX_KEY, tasksStore.get().outbox);
-    }
-    retryDelay = 1000;
+    if (incoming.length) quietSince = Date.now();
+    await persist();
+    failures = 0;
+    if (tasksStore.get().pending.length) again = true;
   } catch {
-    retryTimer = setTimeout(() => void flush(), retryDelay);
-    retryDelay = Math.min(retryDelay * 2, 30_000);
+    failures++;
+    tasksStore.set((s) => ({ ...s, link: s.linked ? 'offline' : 'local' }));
   } finally {
-    sending = null;
-    flushing = false;
-  }
-}
-
-function connect(): void {
-  clearTimeout(linkTimer);
-  source?.removeAllEventListeners();
-  source?.close();
-  tasksStore.set((s) => ({ ...s, link: s.link === 'offline' ? 'offline' : 'connecting' }));
-  const es = new EventSource(`${serverUrl()}/events`, { pollingInterval: 3000, timeoutBeforeConnection: 0 });
-  source = es;
-  es.addEventListener('open', () => {
-    linkDelay = 1000;
-    tasksStore.set((s) => ({ ...s, link: 'live' }));
-    void flush();
-  });
-  // react-native-sse does not retry after a network error, so we do, gently
-  es.addEventListener('error', () => {
-    if (source !== es) return;
-    tasksStore.set((s) => ({ ...s, link: 'offline' }));
-    es.removeAllEventListeners();
-    es.close();
-    clearTimeout(linkTimer);
-    linkTimer = setTimeout(() => { if (source === es) connect(); }, linkDelay);
-    linkDelay = Math.min(linkDelay * 2, 30_000);
-  });
-  es.addEventListener('message', (event) => {
-    if (!event.data) return;
-    try {
-      receive(JSON.parse(event.data) as SyncEvent);
-    } catch {
-      // ignore a malformed message
+    busy = false;
+    if (saved.link) {
+      if (again) { again = false; soon(50); }
+      else timer = setTimeout(() => void sync(), nextDelay());
     }
-  });
+  }
 }
 
-function withPending(task: Task, outbox: Op[]): Task {
-  let t = task;
-  for (const op of outbox) {
-    if (op.kind === 'update' && op.id === task.id) t = { ...t, ...op.patch };
-    if (op.kind === 'create' && op.task.id === task.id) t = { ...t, ...op.task };
-  }
-  return t;
-}
-
-function receive(event: SyncEvent): void {
-  if (event.type === 'snapshot') {
-    tasksStore.set((s) => {
-      const server = new Map(event.tasks.map((t) => [t.id, withPending(t, s.outbox)]));
-      // never let a snapshot make a thought disappear from the phone
-      for (const local of s.tasks) if (!server.has(local.id)) server.set(local.id, local);
-      return { ...s, tasks: sortTasks([...server.values()]) };
-    });
-  } else {
-    const started = savedAt.get(event.task.id);
-    if (started !== undefined) savedAt.delete(event.task.id);
-    tasksStore.set((s) => {
-      const task = withPending(event.task, s.outbox);
-      const exists = s.tasks.some((t) => t.id === task.id);
-      const tasks = exists ? s.tasks.map((t) => (t.id === task.id ? task : t)) : sortTasks([task, ...s.tasks]);
-      return { ...s, tasks, lastTrip: started !== undefined ? { id: task.id, ms: Date.now() - started } : s.lastTrip };
-    });
-  }
-  void save(TASKS_KEY, tasksStore.get().tasks);
-}
+/** Kept for callers that want to nudge the link (pull to refresh, coming online). */
+export const flush = sync;
 
 function sortTasks(tasks: Task[]): Task[] {
   return [...tasks].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-/** Round trip to the desk, in ms, or null if it can't be reached. */
-export async function ping(url = serverUrl()): Promise<number | null> {
-  const start = Date.now();
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4000);
-    const res = await fetch(`${url.replace(/\/+$/, '')}/ping`, { signal: controller.signal });
-    clearTimeout(timer);
-    return res.ok ? Date.now() - start : null;
-  } catch {
-    return null;
-  }
-}
-
 const STALE_DAYS = 7;
 export const isStale = (t: Task) => Date.now() - Date.parse(t.confirmedAt ?? t.createdAt) > STALE_DAYS * 86_400_000;
 export const isOpen = (t: Task) => t.status === 'open' || t.status === 'later';
-export const isWaiting = (id: string, outbox: Op[]) =>
-  outbox.some((op) => (op.kind === 'create' ? op.task.id === id : op.id === id));
+export const isWaiting = (id: string, pending: string[]) => pending.includes(id);

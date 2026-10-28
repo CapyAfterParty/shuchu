@@ -17,6 +17,7 @@ export interface Task {
   minutesSpent?: number;         // from the user's own start and finish taps
   createdAt: string;             // ISO date, used for "still true?"
   confirmedAt?: string;          // when the person last said "still true"
+  updatedAt?: string;            // last edit anywhere; for syncing, the latest edit wins
 }
 
 // What a device sends to create a task. The id is made on the device,

@@ -3,6 +3,9 @@
 Catch tasks on your phone; find them waiting at your desk.
 
 **The phone app lives in [`mobile/`](mobile/README.md).** Start there to run it on your phone (Android or iPhone).
+**Phone and computer link with a QR code** through the website's web app (shuchu-web, `/app`): see
+[Linking a computer](mobile/README.md#linking-a-computer). The local server below is the original
+setup, kept for development.
 **The desk app lives in [`desk/`](desk/):** open it on your computer at `http://localhost:4545/desk`.
 
 - `shared/task.ts`: the one task model, used by phone, desk and server.

@@ -41,9 +41,9 @@ export const REASONS: { key: NotDoingReason; label: string; icon: 'hand' | 'leaf
 export function Inbox({ onClose, onOpen }: { onClose: () => void; onOpen: (id: string) => void }) {
   const p = useTheme();
   const tasks = useTasks((s) => s.tasks);
-  const outbox = useTasks((s) => s.outbox);
-  // "still on its way" only means something once a desk is linked
-  const linked = useTasks((s) => s.link === 'live');
+  const pending = useTasks((s) => s.pending);
+  // "still on its way" only means something once a computer is linked
+  const linked = useTasks((s) => s.linked !== null);
   const [lettingGo, setLettingGo] = useState<string | null>(null);
   const { said, say } = useSpeech();
   const [awake, setAwake] = useState(false);
@@ -74,7 +74,7 @@ export function Inbox({ onClose, onOpen }: { onClose: () => void; onOpen: (id: s
     <Reveal key={t.id} delay={120 + i * 45} rise={8}>
       <Row
         task={t}
-        waiting={linked && isWaiting(t.id, outbox)}
+        waiting={linked && isWaiting(t.id, pending)}
         onPress={() => onOpen(t.id)}
         onClear={() => clear(t)}
         onLetGo={() => { feel.touch(); setLettingGo(lettingGo === t.id ? null : t.id); }}

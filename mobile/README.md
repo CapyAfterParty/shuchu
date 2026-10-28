@@ -8,19 +8,26 @@ You need [Node.js](https://nodejs.org) 22+ on your computer and **Expo Go** on t
 ([Google Play](https://play.google.com/store/apps/details?id=host.exp.exponent) or the App Store). Both on the same Wi-Fi.
 
 ```sh
-# 1. the desk server (from the repo root) — optional, the app works without it
-npm install
-npm start
-
-# 2. the app (second terminal)
 cd mobile
 npm install
 npx expo start
 ```
 
-Android: open Expo Go and tap "Scan QR code". iPhone: scan it with the camera. If the phone can't reach your computer (some office or campus networks block it), run `npx expo start --tunnel` instead. The app finds the desk server on the same computer by itself; you can also enter an address in Settings → Your desk.
+Android: open Expo Go and tap "Scan QR code". iPhone: scan it with the camera. If the phone can't reach your computer (some office or campus networks block it), run `npx expo start --tunnel` instead.
 
-Without a server the app still works: every thought is kept on the phone and sent once a desk is linked.
+## Linking a computer
+
+Open the web app on the computer (`/app` on the Shuchu site) and choose **Link your phone**: it shows a QR code.
+On the phone, either point the camera at it (the page it opens has **Open in Shuchu**) or go to
+Settings → Link a computer → Scan. From then on, what you catch on one appears on the other within seconds.
+
+How it works (`src/data/tasks.ts`, `src/data/linkcore.ts`): every thought is saved on the phone first, then
+encrypted on the phone and swapped with the site's `/api/sync`, which only ever sees sealed records; the latest
+edit of each task wins. Offline, changes wait and go up when the connection returns. The code's secret
+travels after the `#` of its address, so it never reaches a server. `linkcore.ts` is the same file as the
+web app's `src/app/linkcore.ts` in shuchu-web; keep them identical.
+
+Linking needs the camera, a native module added after the last build, so it needs a fresh build (below).
 
 Expo Go is the real app running natively (real GPU glass, haptics, tilt), not the web preview.
 It only runs while `npx expo start` is running on your computer; for an app that stays on the phone, see below.
@@ -67,15 +74,13 @@ eas submit --platform ios                       # uploads to App Store Connect /
 - Version numbers: set `version` in `app.json` for each release; build numbers count up by themselves.
 
 Both stores will ask for screenshots, a short description, a privacy policy URL and a privacy questionnaire.
-For the questionnaire: Shuchu collects nothing. Thoughts stay on the phone and go only to the desk server
-you run yourself; there are no accounts, analytics or ads.
+For the questionnaire: Shuchu collects nothing readable. Thoughts stay on the phone and, once a computer is
+linked, sync end-to-end encrypted (the server stores only sealed records it can't open); there are no accounts,
+analytics or ads.
 
 What's already set up for review: the only permissions are vibration, notifications (the evening question),
-motion (the light follows tilt) and local network (finding your desk). No microphone, no background audio,
-no location, and the encryption export question is answered.
-
-One limit to know: the phone talks to the desk server over plain `http` on your Wi-Fi, which both stores
-allow for local networks. Linking a desk from outside your home network needs the server behind `https`.
+motion (the light follows tilt) and the camera (only to scan the link code). No microphone, no background
+audio, no location. The encryption export question is answered (standard encryption only).
 
 ## What's where
 
