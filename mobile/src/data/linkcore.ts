@@ -107,8 +107,8 @@ export const appUrl = (link: Link) => `shuchu://link?k=${link.token}&o=${encodeU
 
 /** What Sync allows this link right now (free trial, paid, or paused). */
 export interface Plan { paid: boolean; trialEnds: number; active: boolean }
-/** Where to subscribe, for this link (null until the site has a checkout set up). */
-export interface Checkout { monthly: string | null; yearly: string | null }
+/** Where to subscribe on the web, for this link (null until the site has a checkout set up). */
+export interface Checkout { web: string | null }
 
 /** The server said no: `plan` is set when it's because the free trial is over. */
 export class SyncRefused extends Error {
@@ -138,17 +138,11 @@ export async function exchange(link: Link, since: number, push: Sealed[]): Promi
   }
 }
 
-/** The link's plan and where to subscribe. */
-export async function planFor(link: Link): Promise<{ plan: Plan; checkout: Checkout }> {
-  const res = await fetch(`${api(link, 'plan')}?space=${spaceOf(link.token)}`);
+/** The link's plan and where to subscribe. `fresh`: just back from paying, ask the store again. */
+export async function planFor(link: Link, fresh = false): Promise<{ plan: Plan; checkout: Checkout }> {
+  const res = await fetch(`${api(link, 'plan')}?space=${spaceOf(link.token)}${fresh ? '&fresh' : ''}`);
   if (!res.ok) throw new SyncRefused(res.status);
   return (await res.json()) as { plan: Plan; checkout: Checkout };
-}
-
-/** Attach a license key bought earlier to this link. */
-export async function restore(link: Link, key: string): Promise<{ ok: boolean; plan?: Plan; error?: string }> {
-  const res = await fetch(api(link, 'restore'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ space: spaceOf(link.token), key }) });
-  return (await res.json().catch(() => ({ ok: false, error: 'Couldn’t reach Shuchu.' }))) as { ok: boolean; plan?: Plan; error?: string };
 }
 
 /** The live line: the server says "changed" the moment another device syncs. */

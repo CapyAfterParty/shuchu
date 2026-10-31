@@ -29,6 +29,12 @@ web app's `src/app/linkcore.ts` in shuchu-web; keep them identical.
 
 Linking needs the camera, a native module added after the last build, so it needs a fresh build (below).
 
+**Shuchu Sync** (free for 14 days from linking, then a subscription) can be bought in Settings → Computer →
+Keep Sync, through Google Play or the App Store via RevenueCat (`src/data/purchases.ts`). The customer is the
+link's anonymous space id, so a purchase here, in the other store, or on the web unlocks the same link. Put the
+RevenueCat public app keys in `app.json` → `expo.extra.revenuecat`; until then the row stays hidden and Sync is
+bought from the web app. Store setup is in shuchu-web's README → Hosting and selling Sync.
+
 Expo Go is the real app running natively (real GPU glass, haptics, tilt), not the web preview.
 It only runs while `npx expo start` is running on your computer; for an app that stays on the phone, see below.
 

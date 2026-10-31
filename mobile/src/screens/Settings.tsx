@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { type Appearance, type HapticLevel, updateSettings, useSettings } from '../data/settings';
-import { unlink, useTasks } from '../data/tasks';
+import { customerId, refreshPlan, unlink, useTasks } from '../data/tasks';
+import { buy, offers, restoreBought, type Offer } from '../data/purchases';
 import { LinkComputer } from './LinkComputer';
 import { askPermission, formatClock, syncEvening } from '../feel/evening';
 import { feel, previewSound } from '../feel/feel';
@@ -34,6 +35,31 @@ export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay:
   const computer = useTasks((x) => x.devices.find((d) => !/Android|iPhone/.test(d.platform)));
   const plan = useTasks((x) => x.plan);
   const [scanning, setScanning] = useState(false);
+  // Shuchu Sync, bought through this phone's store (RevenueCat); nothing shows if it isn't set up
+  const [plans, setPlans] = useState<Offer[]>([]);
+  const [buying, setBuying] = useState(false);
+  const paid = plan?.paid ?? false;
+  useEffect(() => {
+    const id = customerId();
+    if (linked && !paid && id) void offers(id).then(setPlans);
+  }, [linked, paid]);
+  const choose = async (o: Offer) => {
+    const id = customerId();
+    if (!id || buying) return;
+    setBuying(true);
+    feel.touch();
+    const result = await buy(id, o);
+    setBuying(false);
+    if (result === 'done') { feel.bloom(); say('Thank you! Sync is yours.'); await refreshPlan(true); }
+    else if (result === 'failed') feel.nope();
+  };
+  const restoreIt = async () => {
+    const id = customerId();
+    if (!id) return;
+    feel.touch();
+    const ok = await restoreBought(id);
+    if (ok) { say('Found it. Sync is back.'); await refreshPlan(true); } else say('Nothing to restore on this store account.');
+  };
   const [showTime, setShowTime] = useState(false);
   const { said, say } = useSpeech();
 
@@ -49,7 +75,7 @@ export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay:
   const linkWords = link === 'paused' ? 'Sync paused' : link === 'offline' ? 'Offline · saved on this phone' : computer ? 'Linked to your computer' : 'Linked · waiting for your computer';
   // the subscription is managed on the computer (shuchu's web app), never sold in here
   const left = plan && !plan.paid ? Math.max(0, Math.ceil((plan.trialEnds - Date.now()) / 86_400_000)) : null;
-  const planWords = link === 'paused' ? 'Free trial over · add Shuchu Sync on your computer'
+  const planWords = link === 'paused' ? (plans.length ? 'Free trial over · keep Sync below' : 'Free trial over · add Shuchu Sync on your computer')
     : plan?.paid ? 'Shuchu Sync · encrypted on your devices'
     : left !== null ? `Free for ${left} more ${left === 1 ? 'day' : 'days'} · encrypted` : null;
 
@@ -82,6 +108,21 @@ export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay:
                   </Txt>
                 </View>
               </Row>
+              {!paid && plans.length > 0 && (
+                <>
+                  <Rule />
+                  <Row tall>
+                    <Icon name="drop" size={18} color={p.inkSoft} />
+                    <Txt variant="body" style={styles.grow}>Keep Sync</Txt>
+                    {plans.map((o) => (
+                      <GlassButton key={o.id} onPress={() => void choose(o)} style={styles.test} radius={16} label={`${o.price} a ${o.per}`}>
+                        <Txt variant="label" style={styles.small}>{o.price}/{o.per === 'year' ? 'yr' : 'mo'}</Txt>
+                      </GlassButton>
+                    ))}
+                  </Row>
+                  <Txt variant="whisper" tone="soft" onPress={() => void restoreIt()} accessibilityRole="button" style={styles.restore}>Restore a purchase</Txt>
+                </>
+              )}
               <Rule />
               <Row>
                 <Icon name="link" size={18} color={p.inkFaint} />
@@ -247,6 +288,7 @@ const styles = StyleSheet.create({
   shu: { width: 56, height: 52, marginBottom: space.m },
   shuBubble: { bottom: 62, left: -80, right: -80 },
   replay: { paddingVertical: space.s },
+  restore: { paddingBottom: space.m, paddingLeft: 31 },
 });
 
 function ago(t: number): string {

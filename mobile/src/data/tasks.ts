@@ -11,7 +11,7 @@ import { getRandomBytes, randomUUID } from 'expo-crypto';
 import { AppState, Platform } from 'react-native';
 import type { NewTask, Task, TaskPatch } from '../../../shared/task';
 import { guess } from './guess';
-import { exchange, liveUrl, newToken, parseLink, seal, SyncRefused, unseal, type Link, type Plan, type Sealed } from './linkcore';
+import { exchange, liveUrl, newToken, parseLink, planFor, seal, spaceOf, SyncRefused, unseal, type Link, type Plan, type Sealed } from './linkcore';
 import { createStore, load, loadList, save, useStore } from './store';
 
 /** local: not linked · live: linked and in step · syncing · offline: can't reach the server · paused: the free trial is over */
@@ -124,6 +124,20 @@ export async function unlink(): Promise<void> {
   saved = { ...saved, link: null, since: 0 };
   tasksStore.set((s) => ({ ...s, linked: null, link: 'local', devices: [], plan: null }));
   await save(SYNC_KEY, saved);
+}
+
+/** The id purchases are filed under: the link's anonymous space id. */
+export const customerId = () => (saved.link ? spaceOf(saved.link.token) : null);
+
+/** Look up the plan again (fresh: just bought, ask the store now). */
+export async function refreshPlan(fresh = false): Promise<void> {
+  const link = saved.link;
+  if (!link) return;
+  try {
+    const { plan } = await planFor(link, fresh);
+    tasksStore.set((s) => ({ ...s, plan, link: plan.active && s.link === 'paused' ? 'syncing' : s.link }));
+    if (plan.active) void sync();
+  } catch { /* keep what we had */ }
 }
 
 /** Called when a computer joins the link (it shows the code; the phone scans). */

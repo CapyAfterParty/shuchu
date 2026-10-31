@@ -98,6 +98,10 @@
     "extra": {
       "eas": {
         "projectId": "b90a08dd-dc03-4b43-bace-2bcf68f5b289"
+      },
+      "revenuecat": {
+        "android": "",
+        "ios": ""
       }
     },
     "updates": {
