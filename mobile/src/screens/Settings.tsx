@@ -32,6 +32,7 @@ export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay:
   const link = useTasks((x) => x.link);
   const linked = useTasks((x) => x.linked);
   const computer = useTasks((x) => x.devices.find((d) => !/Android|iPhone/.test(d.platform)));
+  const plan = useTasks((x) => x.plan);
   const [scanning, setScanning] = useState(false);
   const [showTime, setShowTime] = useState(false);
   const { said, say } = useSpeech();
@@ -45,7 +46,12 @@ export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay:
   const eveLabel = useCallback((v: number) => (v % 60 === 0 ? `${(v / 60) % 12 || 12}PM` : null), []);
 
   const seen = computer ? ago(computer.seen) : null;
-  const linkWords = link === 'offline' ? 'Offline · saved on this phone' : computer ? 'Linked to your computer' : 'Linked · waiting for your computer';
+  const linkWords = link === 'paused' ? 'Sync paused' : link === 'offline' ? 'Offline · saved on this phone' : computer ? 'Linked to your computer' : 'Linked · waiting for your computer';
+  // the subscription is managed on the computer (shuchu's web app), never sold in here
+  const left = plan && !plan.paid ? Math.max(0, Math.ceil((plan.trialEnds - Date.now()) / 86_400_000)) : null;
+  const planWords = link === 'paused' ? 'Free trial over · add Shuchu Sync on your computer'
+    : plan?.paid ? 'Shuchu Sync · encrypted on your devices'
+    : left !== null ? `Free for ${left} more ${left === 1 ? 'day' : 'days'} · encrypted` : null;
 
   if (scanning) {
     return (
@@ -71,8 +77,8 @@ export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay:
                 <View style={[styles.dot, { backgroundColor: link === 'live' ? p.inkSoft : 'transparent', borderColor: p.inkSoft }]} />
                 <View style={styles.grow}>
                   <Txt variant="body" numberOfLines={1}>{linkWords}</Txt>
-                  <Txt variant="whisper" tone="faint" style={styles.sub} numberOfLines={1}>
-                    {seen ? `Seen ${seen} · ` : ''}encrypted on your devices
+                  <Txt variant="whisper" tone="faint" style={styles.sub} numberOfLines={2}>
+                    {planWords ?? `${seen ? `Seen ${seen} · ` : ''}encrypted on your devices`}
                   </Txt>
                 </View>
               </Row>

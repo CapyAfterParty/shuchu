@@ -11,11 +11,11 @@ import { getRandomBytes, randomUUID } from 'expo-crypto';
 import { AppState, Platform } from 'react-native';
 import type { NewTask, Task, TaskPatch } from '../../../shared/task';
 import { guess } from './guess';
-import { exchange, newToken, parseLink, seal, unseal, type Link, type Sealed } from './linkcore';
+import { exchange, liveUrl, newToken, parseLink, seal, SyncRefused, unseal, type Link, type Plan, type Sealed } from './linkcore';
 import { createStore, load, loadList, save, useStore } from './store';
 
-/** local: not linked · live: linked and in step · syncing · offline: linked, can't reach the server */
-export type LinkState = 'local' | 'live' | 'syncing' | 'offline';
+/** local: not linked · live: linked and in step · syncing · offline: can't reach the server · paused: the free trial is over */
+export type LinkState = 'local' | 'live' | 'syncing' | 'offline' | 'paused';
 export interface Device { id: string; name: string; platform: string; seen: number }
 
 interface State {
@@ -26,6 +26,8 @@ interface State {
   link: LinkState;
   linked: Link | null;
   devices: Device[];
+  /** Sync's free trial or subscription, as the server last said. */
+  plan: Plan | null;
   /** Phone → server time of the most recent catch, in ms. */
   lastTrip: { id: string; ms: number } | null;
 }
@@ -35,7 +37,7 @@ const SYNC_KEY = 'shuchu.sync.v1';
 
 interface Saved { link: Link | null; since: number; pending: string[]; me: string }
 
-export const tasksStore = createStore<State>({ ready: false, tasks: [], pending: [], link: 'local', linked: null, devices: [], lastTrip: null });
+export const tasksStore = createStore<State>({ ready: false, tasks: [], pending: [], link: 'local', linked: null, devices: [], plan: null, lastTrip: null });
 export const useTasks = <S,>(select: (s: State) => S) => useStore(tasksStore, select);
 
 const random = (n: number) => getRandomBytes(n);
@@ -55,6 +57,7 @@ export async function startTasks(): Promise<void> {
   if (saved.link) void sync();
   AppState.addEventListener('change', (state) => {
     if (state === 'active') { quietSince = Date.now(); void sync(); }
+    else { socket?.close(); socket = null; }
   });
 }
 
@@ -116,8 +119,10 @@ export async function joinLink(text: string): Promise<boolean> {
 
 /** Forget the link on this phone. The tasks stay here, and on the computer. */
 export async function unlink(): Promise<void> {
+  socket?.close();
+  socket = null;
   saved = { ...saved, link: null, since: 0 };
-  tasksStore.set((s) => ({ ...s, linked: null, link: 'local', devices: [] }));
+  tasksStore.set((s) => ({ ...s, linked: null, link: 'local', devices: [], plan: null }));
   await save(SYNC_KEY, saved);
 }
 
@@ -143,8 +148,11 @@ function soon(ms = 200) {
 }
 
 function nextDelay(): number {
+  if (tasksStore.get().link === 'paused') return 10 * 60_000;
   if (failures) return Math.min(60_000, 2000 * 2 ** failures);
   if (AppState.currentState !== 'active') return 120_000;
+  // with the live line open, the server tells us about changes; this is just a safety net
+  if (socket?.readyState === WebSocket.OPEN) return 60_000;
   return Date.now() - quietSince < 10 * 60_000 ? 3000 : 10_000;
 }
 
@@ -171,7 +179,7 @@ export async function sync(): Promise<void> {
       const d: Device = { id: saved.me, name: 'Phone', platform: Platform.OS === 'ios' ? 'iPhone' : Platform.OS === 'android' ? 'Android' : 'Android browser', seen: Date.now() };
       push.push({ id: `device:${saved.me}`, u: d.seen, v: seal(link.token, { kind: 'device', ...d }, random(24)) });
     }
-    const { seq, records } = await exchange(link, saved.since, push);
+    const { seq, records, plan } = await exchange(link, saved.since, push);
     if (saved.link?.token !== link.token) return;
     if (push.some((r) => r.id.startsWith('device:'))) lastPresence = Date.now();
 
@@ -204,7 +212,7 @@ export async function sync(): Promise<void> {
         const at = savedAt.get(id);
         if (at !== undefined) { savedAt.delete(id); lastTrip = { id, ms: Date.now() - at }; }
       }
-      return { ...s, tasks: sortTasks([...map.values()]), pending: still, devices: [...devices.values()].sort((a, b) => b.seen - a.seen), link: 'live', lastTrip };
+      return { ...s, tasks: sortTasks([...map.values()]), pending: still, devices: [...devices.values()].sort((a, b) => b.seen - a.seen), link: 'live', plan: plan ?? s.plan, lastTrip };
     });
 
     if (seq < saved.since) {
@@ -218,10 +226,17 @@ export async function sync(): Promise<void> {
     if (incoming.length) quietSince = Date.now();
     await persist();
     failures = 0;
+    goLive(link);
     if (tasksStore.get().pending.length) again = true;
-  } catch {
-    failures++;
-    tasksStore.set((s) => ({ ...s, link: s.linked ? 'offline' : 'local' }));
+  } catch (e) {
+    if (e instanceof SyncRefused && e.status === 402) {
+      // the free trial is over: everything stays on the phone; syncing waits for a plan
+      failures = 0;
+      tasksStore.set((s) => ({ ...s, link: 'paused', plan: e.plan ?? s.plan }));
+    } else {
+      failures++;
+      tasksStore.set((s) => ({ ...s, link: s.linked ? 'offline' : 'local' }));
+    }
   } finally {
     busy = false;
     if (saved.link) {
@@ -229,6 +244,29 @@ export async function sync(): Promise<void> {
       else timer = setTimeout(() => void sync(), nextDelay());
     }
   }
+}
+
+// ---------- the live line ----------
+// While the app is open, a WebSocket waits for the server to say "something
+// changed" and we sync at once. If it can't connect, polling does the job.
+let socket: WebSocket | null = null;
+let socketFor = '';
+let socketRetry = 2000;
+function goLive(link: Link) {
+  if (AppState.currentState !== 'active' || (socket && socketFor === link.token && socket.readyState <= WebSocket.OPEN)) return;
+  socket?.close();
+  socketFor = link.token;
+  const ws = new WebSocket(liveUrl(link));
+  socket = ws;
+  ws.onopen = () => { socketRetry = 2000; };
+  ws.onmessage = (e) => {
+    try { const m = JSON.parse(String(e.data)) as { seq?: number; plan?: boolean }; if ((m.seq ?? 0) > saved.since || m.plan) void sync(); } catch { /* not for us */ }
+  };
+  ws.onclose = () => {
+    if (socket !== ws) return;
+    socket = null;
+    if (saved.link?.token === link.token && AppState.currentState === 'active') setTimeout(() => { if (saved.link) goLive(saved.link); }, (socketRetry = Math.min(socketRetry * 2, 60_000)));
+  };
 }
 
 /** Kept for callers that want to nudge the link (pull to refresh, coming online). */

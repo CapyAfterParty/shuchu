@@ -105,20 +105,54 @@ export function parseLink(text: string): Link | null {
 /** The address that opens the phone app straight onto the link. */
 export const appUrl = (link: Link) => `shuchu://link?k=${link.token}&o=${encodeURIComponent(link.origin)}`;
 
+/** What Sync allows this link right now (free trial, paid, or paused). */
+export interface Plan { paid: boolean; trialEnds: number; active: boolean }
+/** Where to subscribe, for this link (null until the site has a checkout set up). */
+export interface Checkout { monthly: string | null; yearly: string | null }
+
+/** The server said no: `plan` is set when it's because the free trial is over. */
+export class SyncRefused extends Error {
+  constructor(public status: number, public plan?: Plan, public checkout?: Checkout) { super(`sync ${status}`); }
+}
+
+const api = (link: Link, path: string) => `${link.origin.replace(/\/+$/, '')}/api/${path}`;
+
 /** One round trip: send what changed here, get back everything newer than `since`. */
-export async function exchange(link: Link, since: number, push: Sealed[]): Promise<{ seq: number; records: Sealed[] }> {
+export async function exchange(link: Link, since: number, push: Sealed[]): Promise<{ seq: number; records: Sealed[]; plan?: Plan }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12_000);
   try {
-    const res = await fetch(`${link.origin.replace(/\/+$/, '')}/api/sync`, {
+    const res = await fetch(api(link, 'sync'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ space: spaceOf(link.token), since, push }),
       signal: controller.signal,
     });
-    if (!res.ok) throw new Error(`sync ${res.status}`);
-    return (await res.json()) as { seq: number; records: Sealed[] };
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { plan?: Plan; checkout?: Checkout };
+      throw new SyncRefused(res.status, body.plan, body.checkout);
+    }
+    return (await res.json()) as { seq: number; records: Sealed[]; plan?: Plan };
   } finally {
     clearTimeout(timer);
   }
 }
+
+/** The link's plan and where to subscribe. */
+export async function planFor(link: Link): Promise<{ plan: Plan; checkout: Checkout }> {
+  const res = await fetch(`${api(link, 'plan')}?space=${spaceOf(link.token)}`);
+  if (!res.ok) throw new SyncRefused(res.status);
+  return (await res.json()) as { plan: Plan; checkout: Checkout };
+}
+
+/** Attach a license key bought earlier to this link. */
+export async function restore(link: Link, key: string): Promise<{ ok: boolean; plan?: Plan; error?: string }> {
+  const res = await fetch(api(link, 'restore'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ space: spaceOf(link.token), key }) });
+  return (await res.json().catch(() => ({ ok: false, error: 'Couldn’t reach Shuchu.' }))) as { ok: boolean; plan?: Plan; error?: string };
+}
+
+/** The live line: the server says "changed" the moment another device syncs. */
+export const liveUrl = (link: Link) => `${api(link, 'live').replace(/^http/, 'ws')}?space=${spaceOf(link.token)}`;
+
+/** Whole days left of the free trial (0 once it's over). */
+export const daysLeft = (plan: Plan, now = Date.now()) => Math.max(0, Math.ceil((plan.trialEnds - now) / 86_400_000));
