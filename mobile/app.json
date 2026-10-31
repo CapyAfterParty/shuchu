@@ -13,8 +13,9 @@
       "bundleIdentifier": "app.shuchu",
       "infoPlist": {
         "NSMotionUsageDescription": "Shuchu tilts its light with your phone, so the glass feels real.",
-        "ITSAppUsesNonExemptEncryption": false
-      }
+        "ITSAppUsesNonExemptEncryption": true
+      },
+      "icon": "./assets/icon-ios.png"
     },
     "android": {
       "package": "app.shuchu",

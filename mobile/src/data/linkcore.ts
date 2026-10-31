@@ -145,6 +145,12 @@ export async function planFor(link: Link, fresh = false): Promise<{ plan: Plan; 
   return (await res.json()) as { plan: Plan; checkout: Checkout };
 }
 
+/** Delete this link's synced copy from the server (each device keeps its own). */
+export async function forget(link: Link): Promise<boolean> {
+  const res = await fetch(api(link, 'forget'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ space: spaceOf(link.token) }) }).catch(() => null);
+  return !!res?.ok;
+}
+
 /** The live line: the server says "changed" the moment another device syncs. */
 export const liveUrl = (link: Link) => `${api(link, 'live').replace(/^http/, 'ws')}?space=${spaceOf(link.token)}`;
 

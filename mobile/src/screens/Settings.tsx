@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { type Appearance, type HapticLevel, updateSettings, useSettings } from '../data/settings';
-import { customerId, refreshPlan, unlink, useTasks } from '../data/tasks';
+import { customerId, forgetEverywhere, refreshPlan, unlink, useTasks } from '../data/tasks';
 import { buy, offers, restoreBought, type Offer } from '../data/purchases';
 import { LinkComputer } from './LinkComputer';
 import { askPermission, formatClock, syncEvening } from '../feel/evening';
@@ -130,6 +130,15 @@ export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay:
                   Unlink this phone
                 </Txt>
               </Row>
+              <Txt
+                variant="whisper"
+                tone="faint"
+                onPress={() => { feel.touch(); void forgetEverywhere().then((ok) => say(ok ? 'Deleted from the server. Everything’s still here.' : 'Couldn’t reach Shuchu. Try again.')); }}
+                accessibilityRole="button"
+                style={styles.restore}
+              >
+                Delete the synced copy
+              </Txt>
             </>
           ) : (
             <Row tall>

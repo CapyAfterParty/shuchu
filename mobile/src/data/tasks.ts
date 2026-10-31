@@ -11,7 +11,7 @@ import { getRandomBytes, randomUUID } from 'expo-crypto';
 import { AppState, Platform } from 'react-native';
 import type { NewTask, Task, TaskPatch } from '../../../shared/task';
 import { guess } from './guess';
-import { exchange, liveUrl, newToken, parseLink, planFor, seal, spaceOf, SyncRefused, unseal, type Link, type Plan, type Sealed } from './linkcore';
+import { exchange, forget, liveUrl, newToken, parseLink, planFor, seal, spaceOf, SyncRefused, unseal, type Link, type Plan, type Sealed } from './linkcore';
 import { createStore, load, loadList, save, useStore } from './store';
 
 /** local: not linked · live: linked and in step · syncing · offline: can't reach the server · paused: the free trial is over */
@@ -115,6 +115,15 @@ export async function joinLink(text: string): Promise<boolean> {
   notice('Linked! Your computer will see everything.');
   await sync();
   return true;
+}
+
+/** Delete the synced copy from the server, then unlink. False if the server couldn't be reached. */
+export async function forgetEverywhere(): Promise<boolean> {
+  const link = saved.link;
+  if (!link) return true;
+  const ok = await forget(link);
+  if (ok) await unlink();
+  return ok;
 }
 
 /** Forget the link on this phone. The tasks stay here, and on the computer. */
