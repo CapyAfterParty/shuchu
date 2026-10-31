@@ -112,7 +112,15 @@ export interface Checkout { web: string | null }
 
 /** The server said no: `plan` is set when it's because the free trial is over. */
 export class SyncRefused extends Error {
-  constructor(public status: number, public plan?: Plan, public checkout?: Checkout) { super(`sync ${status}`); }
+  status: number;
+  plan?: Plan;
+  checkout?: Checkout;
+  constructor(status: number, plan?: Plan, checkout?: Checkout) {
+    super(`sync ${status}`);
+    this.status = status;
+    this.plan = plan;
+    this.checkout = checkout;
+  }
 }
 
 const api = (link: Link, path: string) => `${link.origin.replace(/\/+$/, '')}/api/${path}`;

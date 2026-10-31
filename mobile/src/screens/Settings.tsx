@@ -1,7 +1,7 @@
 // Settings: a few grouped rows. Label on the left, its control on the right.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { type Appearance, type HapticLevel, updateSettings, useSettings } from '../data/settings';
 import { customerId, forgetEverywhere, refreshPlan, unlink, useTasks } from '../data/tasks';
 import { buy, offers, restoreBought, type Offer } from '../data/purchases';
@@ -120,6 +120,12 @@ export function Settings({ onClose, onReplay }: { onClose: () => void; onReplay:
                       </GlassButton>
                     ))}
                   </Row>
+                  <Txt variant="whisper" tone="faint" style={styles.restore}>
+                    Renews automatically; cancel any time in your store’s subscriptions.{' '}
+                    <Txt variant="whisper" tone="soft" onPress={() => linked && void Linking.openURL(`${linked.origin}/terms`)} accessibilityRole="link">Terms</Txt>
+                    {' · '}
+                    <Txt variant="whisper" tone="soft" onPress={() => linked && void Linking.openURL(`${linked.origin}/privacy`)} accessibilityRole="link">Privacy</Txt>
+                  </Txt>
                   <Txt variant="whisper" tone="soft" onPress={() => void restoreIt()} accessibilityRole="button" style={styles.restore}>Restore a purchase</Txt>
                 </>
               )}
